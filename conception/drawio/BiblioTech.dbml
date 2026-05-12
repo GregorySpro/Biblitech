@@ -1,0 +1,79 @@
+// BiblioTech - Schéma BDD
+// À coller sur https://dbdiagram.io
+// Cardinalités MERISE : 1,1 / 0,n / 1,n indiquées en note sur chaque FK
+
+Table bibliotheques {
+  id            serial       [pk, not null, note: "Clé primaire auto-incrémentée"]
+  nom           varchar(150) [not null]
+  adresse       text
+  email_contact varchar(150) [not null]
+  telephone     varchar(20)
+  actif         boolean      [not null, default: true]
+}
+
+Table utilisateurs {
+  id              serial       [pk, not null]
+  nom             varchar(100) [not null]
+  prenom          varchar(100) [not null]
+  email           varchar(150) [not null, unique]
+  mot_de_passe    varchar(255) [not null, note: "Hash bcrypt"]
+  role            varchar(30)  [not null, note: "super_admin | admin | bibliothecaire | adherent"]
+  bibliotheque_id integer      [ref: > bibliotheques.id, note: "cardinalité : (0,1) utilisateur — (1,n) bibliothèque | NULL si super_admin"]
+  actif           boolean      [not null, default: true]
+}
+
+Table livres {
+  id             serial       [pk, not null]
+  isbn           varchar(20)  [not null, unique]
+  titre          varchar(255) [not null]
+  auteur         varchar(255) [not null]
+  editeur        varchar(150)
+  genre          varchar(100)
+  couverture_url text         [note: "URL image via Google Books API"]
+  date_ajout     date         [not null]
+}
+
+Table exemplaires {
+  id              serial      [pk, not null]
+  livre_id        integer     [not null, ref: > livres.id,        note: "cardinalité : (1,n) exemplaires — (1,1) livre"]
+  bibliotheque_id integer     [not null, ref: > bibliotheques.id, note: "cardinalité : (1,n) exemplaires — (1,1) bibliothèque"]
+  statut          varchar(20) [not null, note: "disponible | emprunte | reserve | retire"]
+  notes           text
+  date_ajout      date        [not null]
+}
+
+Table prets {
+  id                    serial      [pk, not null]
+  exemplaire_id         integer     [not null, ref: > exemplaires.id,  note: "cardinalité : (0,n) prêts — (1,1) exemplaire"]
+  adherent_id           integer     [not null, ref: > utilisateurs.id, note: "cardinalité : (0,n) prêts — (1,1) adhérent"]
+  bibliotheque_id       integer     [not null, ref: > bibliotheques.id, note: "cardinalité : (0,n) prêts — (1,1) bibliothèque"]
+  date_emprunt          date        [not null]
+  date_retour_prevue    date        [not null]
+  date_retour_effective date
+  statut                varchar(20) [not null, note: "en_cours | rendu | en_retard"]
+}
+
+Table demandes_migration {
+  id                     serial      [pk, not null]
+  adherent_id            integer     [not null, ref: > utilisateurs.id,   note: "cardinalité : (0,n) demandes — (1,1) adhérent"]
+  bibliotheque_source_id integer     [not null, ref: > bibliotheques.id,  note: "cardinalité : (0,n) demandes — (1,1) bibliothèque source"]
+  bibliotheque_cible_id  integer     [not null, ref: > bibliotheques.id,  note: "cardinalité : (0,n) demandes — (1,1) bibliothèque cible"]
+  statut                 varchar(20) [not null, note: "en_attente | approuvee | refusee"]
+  date_demande           date        [not null]
+  commentaire            text
+  date_traitement        date
+}
+
+// ─── RÉCAPITULATIF DES CARDINALITÉS MERISE ───────────────────────────────────
+//
+//  bibliotheques  ||--o{  utilisateurs        (1,1) -- (0,n)
+//  bibliotheques  ||--o{  exemplaires         (1,1) -- (0,n)
+//  livres         ||--o{  exemplaires         (1,1) -- (1,n)
+//  exemplaires    ||--o{  prets               (1,1) -- (0,n)
+//  utilisateurs   ||--o{  prets               (1,1) -- (0,n)
+//  bibliotheques  ||--o{  prets               (1,1) -- (0,n)
+//  utilisateurs   ||--o{  demandes_migration  (1,1) -- (0,n)
+//  bibliotheques  ||--o{  demandes_migration  (1,1) -- (0,n)  [source]
+//  bibliotheques  ||--o{  demandes_migration  (1,1) -- (0,n)  [cible]
+//
+// ─────────────────────────────────────────────────────────────────────────────
