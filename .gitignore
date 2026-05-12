@@ -1,0 +1,28 @@
+﻿# Frontend
+dev/frontend/node_modules/
+dev/frontend/dist/
+dev/frontend/.vite/
+
+# Backend
+dev/backend/vendor/
+dev/backend/var/
+dev/backend/.env.local
+dev/backend/.env.*.local
+dev/backend/config/jwt/
+dev/backend/.php-cs-fixer.cache
+
+# Conception
+conception/node_modules/
+conception/pdf finaux/
+conception/screen_jalon3/
+conception/screen_jalon4/
+conception/template/
+conception/*.docx
+conception/*.txt
+conception/package-lock.json
+
+# Divers
+.DS_Store
+Thumbs.db
+*.swp
+setup-git-history.ps1
