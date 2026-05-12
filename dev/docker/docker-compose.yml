@@ -1,0 +1,65 @@
+version: '3.9'
+
+services:
+
+  # ── Backend Symfony ──────────────────────────────────────
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bibliotech_app
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html
+    environment:
+      - APP_ENV=dev
+      - DATABASE_URL=postgresql://bibliotech:secret@db:5432/bibliotech
+      - JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+      - JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+      - JWT_PASSPHRASE=${JWT_PASSPHRASE}
+      - GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY}
+    depends_on:
+      - db
+    networks:
+      - bibliotech_net
+
+  # ── Base de données PostgreSQL (dev local) ───────────────
+  db:
+    image: postgres:16-alpine
+    container_name: bibliotech_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: bibliotech
+      POSTGRES_USER: bibliotech
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - bibliotech_net
+
+  # ── Frontend React (dev) ─────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bibliotech_front
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080/api
+    depends_on:
+      - app
+    networks:
+      - bibliotech_net
+
+volumes:
+  db_data:
+
+networks:
+  bibliotech_net:
+    driver: bridge

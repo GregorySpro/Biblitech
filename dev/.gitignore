@@ -1,0 +1,16 @@
+# Fichiers sensibles
+.env.local
+*.pem
+
+# Dépendances
+vendor/
+node_modules/
+
+# Cache et logs
+var/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
