@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Palette BiblioTech */
+  --color-primary:       #1E3A8A;
+  --color-primary-hover: #1e40af;
+  --color-primary-light: #EFF6FF;
+  --color-secondary:     #60A5FA;
+  --color-accent:        #16A34A;
+  --color-accent-light:  #DCFCE7;
+  --color-warning:       #EA580C;
+  --color-warning-light: #FFF7ED;
+  --color-danger:        #DC2626;
+  --color-danger-light:  #FEF2F2;
+  --color-surface:       #F3F4F6;
+  --color-border:        #E5E7EB;
+  --color-text:          #111827;
+  --color-text-muted:    #6B7280;
+  --color-text-subtle:   #9CA3AF;
+
+  /* Typographies */
+  --font-sans:    "DM Sans", system-ui, sans-serif;
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", monospace;
+
+  /* Ombres */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
+  --shadow-card-hover: 0 8px 24px rgb(0 0 0 / 0.10);
+  --shadow-sidebar: 4px 0 16px rgb(0 0 0 / 0.12);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar personnalisée */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Focus ring global */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
