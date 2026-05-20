@@ -452,7 +452,7 @@ export function CataloguePage() {
                         {exemplaires.map(ex => (
                           <div key={ex.id} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F3F4F6] text-xs">
                             <div className="flex-1">
-                              <p style={{ fontFamily: 'var(--font-mono)' }} className="font-medium text-[#374151]">{ex.codeExemplaire}</p>
+                              <p style={{ fontFamily: 'var(--font-mono)' }} className="font-medium text-[#374151]">{ex.code_exemplaire}</p>
                               <Badge label={ex.statut === 'disponible' ? 'Disponible' : ex.statut === 'emprunte' ? 'Emprunté' : 'Hors service'}
                                      variant={ex.statut === 'disponible' ? 'success' : ex.statut === 'emprunte' ? 'info' : 'neutral'} />
                             </div>
@@ -732,3 +732,7 @@ export function CataloguePage() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+    </PageLayout>
+  )
+}

@@ -76,10 +76,14 @@ export interface Pret {
 export interface DemandeMigration {
   id: number
   statut: MigrationStatut
-  bibliotheque_origine_id: number
-  bibliotheque_cible_id: number
-  utilisateur_id: number
+  bibliotheque_source_id?: number
+  bibliotheque_cible_id?: number
+  bibliothequeSource?: Bibliotheque
+  bibliothequeCible?: Bibliotheque
+  utilisateur_id?: number
   utilisateur?: Utilisateur
+  motif?: string | null
+  traitee_at?: string | null
   created_at: string
 }
 

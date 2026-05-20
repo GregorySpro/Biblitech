@@ -16,6 +16,7 @@ import {
   BookOpenIcon as BookSolid,
   UserGroupIcon as UsersSolid,
   ArrowsRightLeftIcon as ArrowsSolid,
+  BuildingLibraryIcon as BuildingSolid,
 } from '@heroicons/react/24/solid'
 import clsx from 'clsx'
 import { useAuth } from '../hooks/useAuth'
@@ -42,6 +43,7 @@ const navItems: { to: string; label: string; Icon: ComponentType<any>; IconActiv
   { to: '/catalogue',  label: 'Catalogue',        Icon: BookOpenIcon,           IconActive: BookSolid,   roles: null },
   { to: '/adherents',  label: 'Adhérents',        Icon: UserGroupIcon,          IconActive: UsersSolid,  roles: ['super_admin', 'admin'] },
   { to: '/prets',      label: 'Prêts / Retours',  Icon: ArrowsRightLeftIcon,    IconActive: ArrowsSolid, roles: null },
+  { to: '/demandes-migration', label: 'Migrations', Icon: BuildingLibraryIcon, IconActive: BuildingSolid, roles: null },
 ]
 
 interface SidebarProps {

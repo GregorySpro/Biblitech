@@ -65,12 +65,12 @@ export function AdherentsPage() {
   })
 
   // Fetch users from API
-  const { data: utilisateurs = [], loading, error } = useApiCall(() => utilisateurService.getAll())
+  const { data: utilisateurs = [], loading, error, refetch } = useApiCall(() => utilisateurService.getAll()) as any
 
   const filtered = useMemo(() => {
-    if (!search) return utilisateurs
+    if (!search) return (utilisateurs as Utilisateur[])
     const q = search.toLowerCase()
-    return utilisateurs.filter(u =>
+    return (utilisateurs as Utilisateur[]).filter(u =>
       u.nom.toLowerCase().includes(q) ||
       u.prenom.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
@@ -148,8 +148,7 @@ export function AdherentsPage() {
       }
       setShowFormModal(false)
       setSelected(null)
-      // Refetch via useApiCall by forcing new call
-      window.location.reload()
+      await refetch()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement')
     } finally {
@@ -164,7 +163,7 @@ export function AdherentsPage() {
       await utilisateurService.delete(selected.id)
       setSelected(null)
       setShowDeleteConfirm(false)
-      window.location.reload()
+      await refetch()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
     } finally {

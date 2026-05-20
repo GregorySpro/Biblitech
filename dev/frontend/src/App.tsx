@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { CataloguePage } from './pages/CataloguePage'
 import { AdherentsPage } from './pages/AdherentsPage'
 import { PretsPage } from './pages/PretsPage'
+import { DemandeMigrationPage } from './pages/DemandeMigrationPage'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/dashboard"  element={<DashboardPage />} />
             <Route path="/catalogue"  element={<CataloguePage />} />
             <Route path="/prets"      element={<PretsPage />} />
+            <Route path="/demandes-migration" element={<DemandeMigrationPage />} />
             <Route element={<ProtectedRoute allowedRoles={['super_admin', 'admin']} />}>
               <Route path="/adherents" element={<AdherentsPage />} />
             </Route>
