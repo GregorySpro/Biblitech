@@ -17,6 +17,9 @@ import { StatCard } from '../components/StatCard'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
 import { useAuth } from '../hooks/useAuth'
+import { useApiCall } from '../hooks/useApiCall'
+import { pretService } from '../services/pretService'
+import { statsService } from '../services/statsService'
 import type { Column } from '../components/DataTable'
 import type { Pret } from '../types'
 
@@ -38,34 +41,6 @@ interface PretRow {
   dateRetourPrevue: string
   statut: Pret['statut']
 }
-
-// ── Mock data bibliothèque ────────────────────────────────
-const mockRetards: RetardRow[] = [
-  { id: 1, adherent: 'Martin Sophie',     livre: 'Le Petit Prince',          exemplaire: 'EX-042', dateRetourPrevue: '2026-03-25', joursRetard: 13 },
-  { id: 2, adherent: 'Dupont Marc',       livre: "L'Étranger",               exemplaire: 'EX-011', dateRetourPrevue: '2026-03-28', joursRetard: 10 },
-  { id: 3, adherent: 'Bernard Léa',       livre: 'Les Misérables T.1',       exemplaire: 'EX-078', dateRetourPrevue: '2026-04-01', joursRetard: 6  },
-  { id: 4, adherent: 'Thomas Jean-Paul',  livre: 'Le Comte de Monte-Cristo',  exemplaire: 'EX-103', dateRetourPrevue: '2026-04-03', joursRetard: 4  },
-  { id: 5, adherent: 'Robert Claire',     livre: 'Madame Bovary',            exemplaire: 'EX-056', dateRetourPrevue: '2026-04-04', joursRetard: 3  },
-]
-
-const mockDerniersPrets: PretRow[] = [
-  { id: 10, adherent: 'Leclerc Emma',   livre: '1984',                    datePret: '2026-04-06', dateRetourPrevue: '2026-04-20', statut: 'en_cours'  },
-  { id: 11, adherent: 'Moreau Antoine', livre: 'Dune',                    datePret: '2026-04-05', dateRetourPrevue: '2026-04-19', statut: 'en_cours'  },
-  { id: 12, adherent: 'Simon Julie',    livre: 'Harry Potter T.1',        datePret: '2026-04-04', dateRetourPrevue: '2026-04-18', statut: 'en_cours'  },
-  { id: 13, adherent: 'Laurent Paul',   livre: 'Le Seigneur des Anneaux', datePret: '2026-04-02', dateRetourPrevue: '2026-04-16', statut: 'rendu'     },
-  { id: 14, adherent: 'Garcia Nina',    livre: 'Fondation',               datePret: '2026-04-01', dateRetourPrevue: '2026-04-15', statut: 'rendu'     },
-  { id: 15, adherent: 'Petit Maxime',   livre: "L'Alchimiste",            datePret: '2026-03-30', dateRetourPrevue: '2026-04-13', statut: 'en_retard' },
-]
-
-// ── Mock data adhérent (prêts personnels) ─────────────────
-interface MonPretRow { id: number; livre: string; auteur: string; exemplaire: string; datePret: string; dateRetourPrevue: string; statut: Pret['statut'] }
-
-const mockMesPrets: MonPretRow[] = [
-  { id: 1, livre: 'Dune',           auteur: 'Frank Herbert',  exemplaire: 'EX-056', datePret: '2026-04-05', dateRetourPrevue: '2026-04-19', statut: 'en_cours'  },
-  { id: 2, livre: '1984',           auteur: 'George Orwell',  exemplaire: 'EX-091', datePret: '2026-03-20', dateRetourPrevue: '2026-04-03', statut: 'en_retard' },
-  { id: 3, livre: 'Fondation',      auteur: 'Isaac Asimov',   exemplaire: 'EX-014', datePret: '2026-02-10', dateRetourPrevue: '2026-02-24', statut: 'rendu'     },
-  { id: 4, livre: 'Le Petit Prince',auteur: 'Saint-Exupéry',  exemplaire: 'EX-007', datePret: '2026-01-15', dateRetourPrevue: '2026-01-29', statut: 'rendu'     },
-]
 
 // ── Colonnes ───────────────────────────────────────────────
 const colsRetards: Column<RetardRow>[] = [
@@ -119,15 +94,28 @@ const colsMesPrets: Column<MonPretRow>[] = [
 export function DashboardPage() {
   const [selectedRetard, setSelectedRetard]   = useState<number | null>(null)
   const [selectedDernier, setSelectedDernier] = useState<number | null>(null)
-  const [selectedPret, setSelectedPret]       = useState<number | null>(null)
   const { user } = useAuth()
 
   const isAdherent = user?.role === 'adherent'
   const prenom = user?.email?.split('@')[0] ?? 'vous'
 
-  const mesPretsenCours  = mockMesPrets.filter(p => p.statut === 'en_cours').length
-  const mesPretsenRetard = mockMesPrets.filter(p => p.statut === 'en_retard').length
-  const mesPretsRendus   = mockMesPrets.filter(p => p.statut === 'rendu').length
+  // Fetch stats for staff, loans for members
+  const { data: stats, loading: statsLoading } = useApiCall(
+    () => statsService.getLibrary(),
+    !isAdherent
+  )
+
+  // Fetch loans
+  const { data: allPrets = [], loading: pretsLoading } = useApiCall(() => pretService.getAll())
+
+  // If member, filter to own loans
+  const myPrets = isAdherent
+    ? allPrets.filter(p => p.utilisateur_id === user?.sub)
+    : []
+
+  const mesPretsenCours  = myPrets.filter(p => p.statut === 'en_cours').length
+  const mesPretsenRetard = myPrets.filter(p => p.statut === 'en_retard').length
+  const mesPretsRendus   = myPrets.filter(p => p.statut === 'rendu').length
 
   return (
     <PageLayout>
@@ -215,10 +203,10 @@ export function DashboardPage() {
           <>
             {/* Cartes stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-shrink-0">
-              <StatCard icon={ArrowsRightLeftIcon}     label="Prêts en cours"      value={47}  trend={{ value: 12, positive: true  }} color="blue"   index={0} />
-              <StatCard icon={ExclamationTriangleIcon} label="Prêts en retard"      value={8}   trend={{ value: 3,  positive: false }} color="red"    index={1} />
-              <StatCard icon={BookOpenIcon}            label="Exemplaires dispo."   value={234} trend={{ value: 5,  positive: false }} color="green"  index={2} />
-              <StatCard icon={UserGroupIcon}           label="Adhérents actifs"     value={156} trend={{ value: 8,  positive: true  }} color="orange" index={3} />
+              <StatCard icon={ArrowsRightLeftIcon}     label="Prêts en cours"      value={statsLoading ? '...' : stats?.pretsenCours ?? 0}  trend={{ value: 0, positive: true  }} color="blue"   index={0} />
+              <StatCard icon={ExclamationTriangleIcon} label="Prêts en retard"      value={statsLoading ? '...' : stats?.pretsEnRetard ?? 0}   trend={{ value: 0, positive: false }} color="red"    index={1} />
+              <StatCard icon={BookOpenIcon}            label="Exemplaires dispo."   value={statsLoading ? '...' : stats?.totalExemplaires ?? 0} trend={{ value: 0, positive: false }} color="green"  index={2} />
+              <StatCard icon={UserGroupIcon}           label="Adhérents actifs"     value={statsLoading ? '...' : stats?.adherentsActifs ?? 0} trend={{ value: 0, positive: true  }} color="orange" index={3} />
             </div>
 
             {/* Tables */}

@@ -14,22 +14,10 @@ import { SearchBar } from '../components/SearchBar'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
 import { useAuth } from '../hooks/useAuth'
+import { useApiCall } from '../hooks/useApiCall'
+import { livreService } from '../services/livreService'
 import type { Column } from '../components/DataTable'
 import type { Livre } from '../types'
-
-// ── Mock data ──────────────────────────────────────────────
-const mockLivres: Livre[] = [
-  { id: 1,  isbn: '9782070360024', titre: 'Le Petit Prince',          auteur: 'Antoine de Saint-Exupéry', editeur: 'Gallimard',        annee_publication: 1943, genre: 'Roman',         resume: 'Le Petit Prince est un conte philosophique et poétique sous forme d\'histoire pour enfants.',        couverture_url: null, bibliotheque_id: 1 },
-  { id: 2,  isbn: '9782070360178', titre: 'L\'Étranger',              auteur: 'Albert Camus',             editeur: 'Gallimard',        annee_publication: 1942, genre: 'Roman',         resume: 'L\'Étranger est le premier roman d\'Albert Camus, publié en 1942.',                                  couverture_url: null, bibliotheque_id: 1 },
-  { id: 3,  isbn: '9782253004226', titre: 'Les Misérables T.1',       auteur: 'Victor Hugo',              editeur: 'Le Livre de Poche', annee_publication: 1862, genre: 'Roman classique', resume: 'Les Misérables est un roman de Victor Hugo publié en 1862, considéré comme l\'un des plus grands romans du XIXe siècle.', couverture_url: null, bibliotheque_id: 1 },
-  { id: 4,  isbn: '9782253004097', titre: 'Madame Bovary',            auteur: 'Gustave Flaubert',         editeur: 'Le Livre de Poche', annee_publication: 1857, genre: 'Roman classique', resume: 'Madame Bovary est le premier roman de Gustave Flaubert, publié en 1857.',                            couverture_url: null, bibliotheque_id: 1 },
-  { id: 5,  isbn: '9782070360284', titre: '1984',                     auteur: 'George Orwell',            editeur: 'Gallimard',        annee_publication: 1949, genre: 'Science-fiction', resume: '1984 est un roman dystopique de George Orwell publié en 1949.',                                        couverture_url: null, bibliotheque_id: 1 },
-  { id: 6,  isbn: '9782266130370', titre: 'Dune',                     auteur: 'Frank Herbert',            editeur: 'Pocket',           annee_publication: 1965, genre: 'Science-fiction', resume: 'Dune est un roman de science-fiction écrit par Frank Herbert.',                                         couverture_url: null, bibliotheque_id: 1 },
-  { id: 7,  isbn: '9782070646951', titre: 'Harry Potter à l\'école des sorciers', auteur: 'J.K. Rowling', editeur: 'Gallimard Jeunesse', annee_publication: 1997, genre: 'Fantasy',        resume: 'Harry Potter est un jeune orphelin qui découvre à ses 11 ans qu\'il est un sorcier.',      couverture_url: null, bibliotheque_id: 1 },
-  { id: 8,  isbn: '9782070612888', titre: 'Le Seigneur des Anneaux',  auteur: 'J.R.R. Tolkien',           editeur: 'Gallimard',        annee_publication: 1954, genre: 'Fantasy',        resume: 'Le Seigneur des Anneaux est un roman de J. R. R. Tolkien, publié en trois volumes entre 1954 et 1955.', couverture_url: null, bibliotheque_id: 1 },
-  { id: 9,  isbn: '9782266025768', titre: 'Fondation',                auteur: 'Isaac Asimov',             editeur: 'Pocket',           annee_publication: 1951, genre: 'Science-fiction', resume: 'Fondation est un roman de science-fiction d\'Isaac Asimov, premier tome du Cycle de Fondation.',      couverture_url: null, bibliotheque_id: 1 },
-  { id: 10, isbn: '9782290004326', titre: 'L\'Alchimiste',            auteur: 'Paulo Coelho',             editeur: 'J\'ai lu',         annee_publication: 1988, genre: 'Roman',         resume: 'L\'Alchimiste est un roman de l\'écrivain brésilien Paulo Coelho, publié en 1988.',                    couverture_url: null, bibliotheque_id: 1 },
-]
 
 // ── Colonnes ───────────────────────────────────────────────
 const columns: Column<Livre>[] = [
@@ -55,16 +43,19 @@ export function CataloguePage() {
   const { user } = useAuth()
   const canEdit = user?.role !== 'adherent'
 
+  // Fetch books from API
+  const { data: livres = [], loading, error } = useApiCall(() => livreService.getAll())
+
   const filtered = useMemo(() => {
-    if (!search) return mockLivres
+    if (!search) return livres
     const q = search.toLowerCase()
-    return mockLivres.filter(l =>
+    return livres.filter(l =>
       l.titre.toLowerCase().includes(q) ||
       l.auteur.toLowerCase().includes(q) ||
       l.isbn.includes(q) ||
       l.genre.toLowerCase().includes(q)
     )
-  }, [search])
+  }, [search, livres])
 
   return (
     <PageLayout>
@@ -81,7 +72,9 @@ export function CataloguePage() {
             <h1 style={{ fontFamily: 'var(--font-display)' }} className="text-xl font-bold text-[#111827]">
               Catalogue
             </h1>
-            <p className="text-sm text-[#6B7280] mt-0.5">{mockLivres.length} livres dans la bibliothèque</p>
+            <p className="text-sm text-[#6B7280] mt-0.5">
+              {loading ? 'Chargement...' : error ? 'Erreur' : `${livres.length} livres dans la bibliothèque`}
+            </p>
           </div>
         </motion.div>
 
