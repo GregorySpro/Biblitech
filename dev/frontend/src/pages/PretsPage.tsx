@@ -73,12 +73,18 @@ export function PretsPage() {
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<FilterStatut>('tous')
   const [selected, setSelected] = useState<PretRow | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [returning, setReturning] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [exemplaire_id, setExemplaireId] = useState('')
+  const [utilisateur_id, setUtilisateurId] = useState('')
   const { user } = useAuth()
   const isAdherent = user?.role === 'adherent'
   const canManage  = !isAdherent
 
   // Fetch loans from API
-  const { data: allPrets = [], loading, error } = useApiCall(() => pretService.getAll())
+  const { data: allPrets = [], loading, error, refetch } = useApiCall(() => pretService.getAll())
 
   // Member sees only their own loans
   const sourcePrets = isAdherent
@@ -100,6 +106,45 @@ export function PretsPage() {
         )
       })
   }, [search, filter, sourcePrets])
+
+  const handleCreateLoan = async () => {
+    if (!exemplaire_id.trim() || !utilisateur_id.trim()) {
+      setFormError('Exemplaire et adhérent sont obligatoires')
+      return
+    }
+    setCreating(true)
+    try {
+      setFormError(null)
+      await pretService.create({
+        exemplaire_id: parseInt(exemplaire_id),
+        utilisateur_id: parseInt(utilisateur_id),
+      })
+      setShowCreateForm(false)
+      setExemplaireId('')
+      setUtilisateurId('')
+      setSelected(null)
+      await refetch()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erreur lors de la création du prêt')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRegisterReturn = async () => {
+    if (!selected) return
+    setReturning(true)
+    try {
+      setFormError(null)
+      await pretService.registerReturn(selected.id)
+      setSelected(null)
+      await refetch()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement du retour')
+    } finally {
+      setReturning(false)
+    }
+  }
 
   return (
     <PageLayout>
@@ -189,16 +234,19 @@ export function PretsPage() {
             <div className="flex items-center gap-2.5 flex-shrink-0 pt-1">
               {canManage && (
                 <>
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-sm font-semibold hover:bg-[#1e40af] transition-all duration-200 shadow-sm hover:shadow-md shadow-[#1E3A8A]/20">
+                  <button
+                    onClick={() => setShowCreateForm(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-sm font-semibold hover:bg-[#1e40af] transition-all duration-200 shadow-sm hover:shadow-md shadow-[#1E3A8A]/20">
                     <PlusIcon className="w-4 h-4" />
                     Nouveau prêt
                   </button>
                   <button
                     disabled={!selected || selected.statut !== 'en_cours' && selected.statut !== 'en_retard'}
+                    onClick={handleRegisterReturn}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#16A34A]/30 bg-white text-sm font-medium text-[#16A34A] hover:bg-green-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <ArrowUturnLeftIcon className="w-4 h-4" />
-                    Enregistrer le retour
+                    {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
                   </button>
                 </>
               )}
@@ -305,9 +353,12 @@ export function PretsPage() {
 
                   {/* Action rapide retour */}
                   {canManage && (selected.statut === 'en_cours' || selected.statut === 'en_retard') && (
-                    <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2">
+                    <button
+                      onClick={handleRegisterReturn}
+                      disabled={returning}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2 disabled:opacity-40">
                       <ArrowUturnLeftIcon className="w-4 h-4" />
-                      Enregistrer le retour
+                      {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
                     </button>
                   )}
                 </div>
@@ -403,14 +454,93 @@ export function PretsPage() {
 
             {/* Action rapide retour */}
             {canManage && (selected.statut === 'en_cours' || selected.statut === 'en_retard') && (
-              <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2">
+              <button
+                onClick={handleRegisterReturn}
+                disabled={returning}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2 disabled:opacity-40">
                 <ArrowUturnLeftIcon className="w-4 h-4" />
-                Enregistrer le retour
+                {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
               </button>
             )}
           </div>
         )}
       </BottomSheet>
+
+      {/* ── Create loan form modal ── */}
+      <AnimatePresence>
+        {showCreateForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+            onClick={() => !creating && setShowCreateForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-[#111827] mb-6">Créer un nouveau prêt</h3>
+
+              {formError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
+              <div className="space-y-4 mb-6">
+                {/* Exemplaire ID */}
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1">ID Exemplaire *</label>
+                  <input
+                    type="number"
+                    value={exemplaire_id}
+                    onChange={e => setExemplaireId(e.target.value)}
+                    placeholder="ID de la copie du livre"
+                    disabled={creating}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                  />
+                  <p className="text-xs text-[#6B7280] mt-1">Saisissez l'ID de la copie du livre (exemplaire)</p>
+                </div>
+
+                {/* Utilisateur ID */}
+                <div>
+                  <label className="block text-sm font-medium text-[#374151] mb-1">ID Adhérent *</label>
+                  <input
+                    type="number"
+                    value={utilisateur_id}
+                    onChange={e => setUtilisateurId(e.target.value)}
+                    placeholder="ID de l'adhérent"
+                    disabled={creating}
+                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                  />
+                  <p className="text-xs text-[#6B7280] mt-1">Saisissez l'ID de l'adhérent qui emprunte</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  disabled={creating}
+                  onClick={() => setShowCreateForm(false)}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
+                >
+                  Annuler
+                </button>
+                <button
+                  disabled={creating}
+                  onClick={handleCreateLoan}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#1E3A8A] text-white text-sm font-medium hover:bg-[#1e40af] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {creating ? '...' : 'Créer le prêt'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </PageLayout>
   )
 }
