@@ -18,8 +18,9 @@ import { LoadingState } from '../components/LoadingState'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
 import { livreService } from '../services/livreService'
+import { exemplaireService } from '../services/exemplaireService'
 import type { Column } from '../components/DataTable'
-import type { Livre } from '../types'
+import type { Livre, Exemplaire } from '../types'
 
 // ── Colonnes ───────────────────────────────────────────────
 const columns: Column<Livre>[] = [
@@ -57,6 +58,12 @@ export function CataloguePage() {
     genre: '',
     resume: '',
   })
+  const [exemplaires, setExemplaires] = useState<Exemplaire[]>([])
+  const [loadingExemplaires, setLoadingExemplaires] = useState(false)
+  const [showExemplaireForm, setShowExemplaireForm] = useState(false)
+  const [exemplaireSaving, setExemplaireSaving] = useState(false)
+  const [codeExemplaire, setCodeExemplaire] = useState('')
+  const [exemplaireStatut, setExemplaireStatut] = useState<'disponible' | 'emprunte' | 'hors_service'>('disponible')
   const { user } = useAuth()
   const canEdit = user?.role !== 'adherent'
 
@@ -147,6 +154,55 @@ export function CataloguePage() {
       setIsbnError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement')
     } finally {
       setFormSaving(false)
+    }
+  }
+
+  // Load exemplaires when book is selected
+  const loadExemplaires = async (livreId: number) => {
+    setLoadingExemplaires(true)
+    try {
+      const data = await exemplaireService.getByLivre(livreId)
+      setExemplaires(data)
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'Erreur lors du chargement des exemplaires')
+    } finally {
+      setLoadingExemplaires(false)
+    }
+  }
+
+  // Handle adding exemplaire
+  const handleAddExemplaire = async () => {
+    if (!codeExemplaire.trim() || !selected) {
+      setIsbnError('Code exemplaire obligatoire')
+      return
+    }
+    setExemplaireSaving(true)
+    try {
+      setIsbnError(null)
+      await exemplaireService.create({
+        livreId: selected.id,
+        codeExemplaire: codeExemplaire.trim(),
+        statut: exemplaireStatut,
+      })
+      setCodeExemplaire('')
+      setExemplaireStatut('disponible')
+      setShowExemplaireForm(false)
+      await loadExemplaires(selected.id)
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la création')
+    } finally {
+      setExemplaireSaving(false)
+    }
+  }
+
+  // Handle deleting exemplaire
+  const handleDeleteExemplaire = async (id: number) => {
+    if (!window.confirm('Supprimer cet exemplaire ?')) return
+    try {
+      await exemplaireService.delete(id)
+      if (selected) await loadExemplaires(selected.id)
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
     }
   }
 
@@ -242,7 +298,15 @@ export function CataloguePage() {
                 columns={columns}
                 data={filtered}
                 selectedId={selected?.id ?? null}
-                onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
+                onRowClick={row => {
+                  if (selected?.id === row.id) {
+                    setSelected(null)
+                    setExemplaires([])
+                  } else {
+                    setSelected(row)
+                    loadExemplaires(row.id)
+                  }
+                }}
                 emptyMessage="Aucun livre ne correspond à votre recherche."
               />
             )}
@@ -337,6 +401,46 @@ export function CataloguePage() {
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF] mb-2">Résumé</p>
                     <p className="text-sm text-[#6B7280] leading-relaxed">{selected.resume}</p>
+                  </div>
+
+                  {/* Exemplaires section */}
+                  <div className="border-t border-[#F3F4F6] pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF]">Exemplaires ({exemplaires.length})</p>
+                      {canEdit && (
+                        <button
+                          onClick={() => setShowExemplaireForm(true)}
+                          className="text-[#1E3A8A] hover:text-[#1e40af] transition-colors"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    {loadingExemplaires ? (
+                      <p className="text-xs text-[#6B7280]">Chargement...</p>
+                    ) : exemplaires.length > 0 ? (
+                      <div className="space-y-2">
+                        {exemplaires.map(ex => (
+                          <div key={ex.id} className="flex items-center justify-between p-2.5 rounded-lg bg-[#F3F4F6] text-xs">
+                            <div className="flex-1">
+                              <p style={{ fontFamily: 'var(--font-mono)' }} className="font-medium text-[#374151]">{ex.codeExemplaire}</p>
+                              <Badge label={ex.statut === 'disponible' ? 'Disponible' : ex.statut === 'emprunte' ? 'Emprunté' : 'Hors service'}
+                                     variant={ex.statut === 'disponible' ? 'success' : ex.statut === 'emprunte' ? 'info' : 'neutral'} />
+                            </div>
+                            {canEdit && (
+                              <button
+                                onClick={() => handleDeleteExemplaire(ex.id)}
+                                className="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                              >
+                                <TrashIcon className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-[#9CA3AF]">Aucune copie</p>
+                    )}
                   </div>
                 </div>
               </motion.div>
@@ -529,7 +633,73 @@ export function CataloguePage() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-    </PageLayout>
-  )
-}
+
+        {/* ── Add exemplaire modal ── */}
+        <AnimatePresence>
+          {showExemplaireForm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+              onClick={() => !exemplaireSaving && setShowExemplaireForm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold text-[#111827] mb-6">Ajouter une copie</h3>
+
+                <div className="space-y-4 mb-6">
+                  {/* Code Exemplaire */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Code exemplaire *</label>
+                    <input
+                      type="text"
+                      value={codeExemplaire}
+                      onChange={e => setCodeExemplaire(e.target.value)}
+                      placeholder="Identifiant unique"
+                      disabled={exemplaireSaving}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* Statut */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Statut</label>
+                    <select
+                      value={exemplaireStatut}
+                      onChange={e => setExemplaireStatut(e.target.value as any)}
+                      disabled={exemplaireSaving}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                    >
+                      <option value="disponible">Disponible</option>
+                      <option value="emprunte">Emprunté</option>
+                      <option value="hors_service">Hors service</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={exemplaireSaving}
+                    onClick={() => setShowExemplaireForm(false)}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    disabled={exemplaireSaving}
+                    onClick={handleAddExemplaire}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-[#1E3A8A] text-white text-sm font-medium hover:bg-[#1e40af] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {exemplaireSaving ? '...' : 'Ajouter'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
