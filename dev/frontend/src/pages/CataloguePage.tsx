@@ -13,6 +13,8 @@ import { PageLayout } from '../components/PageLayout'
 import { SearchBar } from '../components/SearchBar'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
+import { ErrorAlert } from '../components/ErrorAlert'
+import { LoadingState } from '../components/LoadingState'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
 import { livreService } from '../services/livreService'
@@ -40,20 +42,37 @@ export function CataloguePage() {
   const [search, setSearch]         = useState('')
   const [selected, setSelected]     = useState<Livre | null>(null)
   const [isbnSearch, setIsbnSearch] = useState('')
+  const [isbnError, setIsbnError]   = useState<string | null>(null)
   const { user } = useAuth()
   const canEdit = user?.role !== 'adherent'
 
   // Fetch books from API
-  const { data: livres = [], loading, error } = useApiCall(() => livreService.getAll())
+  const { data: livres = [], loading, error, refetch } = useApiCall(() => livreService.getAll())
+
+  // Handle ISBN search
+  const handleIsbnSearch = async () => {
+    if (!isbnSearch.trim()) {
+      setIsbnError('Veuillez entrer un ISBN')
+      return
+    }
+    try {
+      setIsbnError(null)
+      const livre = await livreService.searchByIsbn(isbnSearch.trim())
+      setSelected(livre)
+      setIsbnSearch('')
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'ISBN non trouvé')
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!search) return livres
     const q = search.toLowerCase()
     return livres.filter(l =>
-      l.titre.toLowerCase().includes(q) ||
-      l.auteur.toLowerCase().includes(q) ||
-      l.isbn.includes(q) ||
-      l.genre.toLowerCase().includes(q)
+      l.titre?.toLowerCase().includes(q) ||
+      l.auteur?.toLowerCase().includes(q) ||
+      l.isbn?.includes(q) ||
+      l.genre?.toLowerCase().includes(q)
     )
   }, [search, livres])
 
@@ -78,6 +97,22 @@ export function CataloguePage() {
           </div>
         </motion.div>
 
+        {/* Affichage des erreurs */}
+        {error && (
+          <ErrorAlert
+            message="Erreur de chargement"
+            details="Impossible de charger le catalogue. Veuillez réessayer."
+            onDismiss={() => refetch()}
+          />
+        )}
+        {isbnError && (
+          <ErrorAlert
+            message="Erreur"
+            details={isbnError}
+            onDismiss={() => setIsbnError(null)}
+          />
+        )}
+
         {/* ── Zone recherche (right-up-part) ── */}
         <div className="flex gap-3 flex-shrink-0">
           <SearchBar
@@ -98,7 +133,10 @@ export function CataloguePage() {
                 className="pl-9 pr-4 py-2.5 w-52 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all duration-200 shadow-sm"
               />
             </div>
-            <button className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#F3F4F6] border border-[#E5E7EB] text-sm font-medium text-[#374151] hover:bg-[#E5E7EB] transition-colors shadow-sm">
+            <button
+              onClick={handleIsbnSearch}
+              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#F3F4F6] border border-[#E5E7EB] text-sm font-medium text-[#374151] hover:bg-[#E5E7EB] transition-colors shadow-sm"
+            >
               <QrCodeIcon className="w-4 h-4" />
               Rechercher
             </button>
@@ -112,13 +150,17 @@ export function CataloguePage() {
           <div className="flex flex-col flex-1 min-w-0 gap-3">
 
             {/* Table (right-down-left-up-part) */}
-            <DataTable
-              columns={columns}
-              data={filtered}
-              selectedId={selected?.id ?? null}
-              onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
-              emptyMessage="Aucun livre ne correspond à votre recherche."
-            />
+            {loading ? (
+              <LoadingState message="Chargement du catalogue..." />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={filtered}
+                selectedId={selected?.id ?? null}
+                onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
+                emptyMessage="Aucun livre ne correspond à votre recherche."
+              />
+            )}
 
             {/* Actions (right-down-left-down-part) */}
             {canEdit && (
