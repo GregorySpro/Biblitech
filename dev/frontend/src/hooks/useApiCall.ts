@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface UseApiCallState<T> {
   data: T | null
@@ -25,11 +25,13 @@ export function useApiCall<T>(
       const data = await fn()
       setState({ data, loading: false, error: null })
     } catch (error) {
+      const errorObj = error instanceof Error ? error : new Error(String(error))
       setState(s => ({
         ...s,
         loading: false,
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: errorObj,
       }))
+      throw errorObj
     }
   }, [fn])
 
@@ -38,10 +40,11 @@ export function useApiCall<T>(
   }, [])
 
   // Auto-fetch on mount if immediate is true
-  if (immediate && state.data === null && !state.loading && state.error === null) {
-    // Schedule refetch for next render
-    void refetch()
-  }
+  useEffect(() => {
+    if (immediate) {
+      void refetch()
+    }
+  }, [immediate, refetch])
 
   return { ...state, refetch, setData }
 }
