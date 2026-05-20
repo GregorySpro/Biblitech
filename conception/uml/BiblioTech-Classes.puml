@@ -1,0 +1,285 @@
+@startuml BiblioTech-Classes
+!theme plain
+skinparam classBackgroundColor #EEF4FF
+skinparam classBorderColor #3B5998
+skinparam classArrowColor #555555
+skinparam shadowing false
+skinparam defaultFontName Calibri
+skinparam defaultFontSize 12
+skinparam packageBackgroundColor #F8F9FA
+skinparam packageBorderColor #AAAAAA
+skinparam stereotypeCBackgroundColor #FDEBD0
+skinparam linetype ortho
+
+title Diagramme de classes – BiblioTech (Architecture Symfony)
+
+' ═══════════════════════════════════════════════════════════
+' PACKAGE : Entities (Doctrine ORM)
+' ═══════════════════════════════════════════════════════════
+package "Entities" <<Rectangle>> {
+
+    class Bibliotheque {
+        - id : int
+        - nom : string
+        - adresse : string
+        - emailContact : string
+        - telephone : ?string
+        - dateInscription : DateTimeImmutable
+        - actif : bool
+        --
+        + getId() : int
+        + getNom() : string
+        + isActif() : bool
+    }
+
+    class Utilisateur {
+        - id : int
+        - nom : string
+        - prenom : string
+        - email : string
+        - motDePasse : string
+        - role : string
+        - dateInscription : DateTimeImmutable
+        - actif : bool
+        --
+        + getId() : int
+        + getEmail() : string
+        + getRole() : string
+        + getBibliothequeId() : ?int
+        + getRoles() : array
+    }
+
+    class Livre {
+        - id : int
+        - isbn : string
+        - titre : string
+        - auteur : string
+        - editeur : ?string
+        - anneePublication : ?int
+        - genre : ?string
+        - resume : ?string
+        - couvertureUrl : ?string
+        - dateAjout : DateTimeImmutable
+        --
+        + getId() : int
+        + getIsbn() : string
+        + getTitre() : string
+    }
+
+    class Exemplaire {
+        - id : int
+        - statut : string
+        - dateAjout : DateTimeImmutable
+        - notes : ?string
+        --
+        + getId() : int
+        + getStatut() : string
+        + isDisponible() : bool
+    }
+
+    class Pret {
+        - id : int
+        - dateEmprunt : DateTimeImmutable
+        - dateRetourPrevue : DateTimeImmutable
+        - dateRetourEffective : ?DateTimeImmutable
+        - statut : string
+        --
+        + getId() : int
+        + getStatut() : string
+        + isEnRetard() : bool
+    }
+
+    class DemandeMigration {
+        - id : int
+        - statut : string
+        - dateDemande : DateTimeImmutable
+        - dateTraitement : ?DateTimeImmutable
+        - commentaire : ?string
+        --
+        + getId() : int
+        + getStatut() : string
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+' PACKAGE : Repositories
+' ═══════════════════════════════════════════════════════════
+package "Repositories" <<Rectangle>> {
+
+    class BibliothequeRepository {
+        + findAllActives() : array
+        + findById(id) : ?Bibliotheque
+    }
+
+    class UtilisateurRepository {
+        + findByEmail(email) : ?Utilisateur
+        + findByBibliotheque(id) : array
+        + findByRole(role) : array
+    }
+
+    class LivreRepository {
+        + findByIsbn(isbn) : ?Livre
+        + findByTitreOrAuteur(q) : array
+    }
+
+    class ExemplaireRepository {
+        + findByBibliotheque(id) : array
+        + findDisponiblesByLivre(livreId) : array
+        + updateStatut(id, statut) : void
+    }
+
+    class PretRepository {
+        + findEnCoursByAdherent(adherentId) : array
+        + findEnRetard() : array
+        + findByBibliotheque(id) : array
+    }
+
+    class DemandeMigrationRepository {
+        + findEnAttente() : array
+        + findByAdherent(adherentId) : array
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+' PACKAGE : Services (Logique métier)
+' ═══════════════════════════════════════════════════════════
+package "Services" <<Rectangle>> {
+
+    class PretService {
+        - pretRepository : PretRepository
+        - exemplaireRepository : ExemplaireRepository
+        --
+        + enregistrerPret(dto : PretDTO) : Pret
+        + enregistrerRetour(pretId : int) : Pret
+        + listerEnRetard() : array
+    }
+
+    class LivreService {
+        - livreRepository : LivreRepository
+        - googleBooksService : GoogleBooksService
+        --
+        + creerLivre(dto : LivreDTO) : Livre
+        + rechercherParIsbn(isbn : string) : ?LivreDTO
+        + rechercherCatalogue(q : string) : array
+    }
+
+    class GoogleBooksService {
+        - apiKey : string
+        - httpClient : HttpClientInterface
+        --
+        + fetchByIsbn(isbn : string) : ?LivreMetadataDTO
+    }
+
+    class UtilisateurService {
+        - utilisateurRepository : UtilisateurRepository
+        - passwordHasher : UserPasswordHasherInterface
+        --
+        + creerCompte(dto : UtilisateurDTO) : Utilisateur
+        + desactiverCompte(id : int) : void
+        + changerMotDePasse(id : int, nouveau : string) : void
+    }
+
+    class MigrationService {
+        - migrationRepository : DemandeMigrationRepository
+        - utilisateurRepository : UtilisateurRepository
+        --
+        + soumettreDemande(dto : MigrationDTO) : DemandeMigration
+        + validerDemande(id : int) : DemandeMigration
+        + refuserDemande(id : int, commentaire : string) : DemandeMigration
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+' PACKAGE : Controllers (API REST)
+' ═══════════════════════════════════════════════════════════
+package "Controllers" <<Rectangle>> {
+
+    class AuthController {
+        + login(request) : JsonResponse
+        + logout(request) : JsonResponse
+    }
+
+    class LivreController {
+        - livreService : LivreService
+        --
+        + index(request) : JsonResponse
+        + show(isbn) : JsonResponse
+        + create(request) : JsonResponse
+        + update(id, request) : JsonResponse
+        + delete(id) : JsonResponse
+    }
+
+    class PretController {
+        - pretService : PretService
+        --
+        + index(request) : JsonResponse
+        + create(request) : JsonResponse
+        + retour(id) : JsonResponse
+        + enRetard() : JsonResponse
+    }
+
+    class UtilisateurController {
+        - utilisateurService : UtilisateurService
+        --
+        + index() : JsonResponse
+        + create(request) : JsonResponse
+        + update(id, request) : JsonResponse
+        + deactivate(id) : JsonResponse
+    }
+
+    class MigrationController {
+        - migrationService : MigrationService
+        --
+        + create(request) : JsonResponse
+        + valider(id) : JsonResponse
+        + refuser(id, request) : JsonResponse
+        + listEnAttente() : JsonResponse
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+' RELATIONS – Entités
+' ═══════════════════════════════════════════════════════════
+
+Bibliotheque "1" o-- "0..*" Utilisateur       : emploie / accueille >
+Bibliotheque "1" o-- "0..*" Exemplaire         : possède >
+Livre        "1" o-- "0..*" Exemplaire         : est représenté par >
+Exemplaire   "1" o-- "0..*" Pret               : fait l'objet de >
+Utilisateur  "1" o-- "0..*" Pret               : effectue >
+Utilisateur  "1" o-- "0..*" DemandeMigration   : soumet >
+Bibliotheque "1" o-- "0..*" DemandeMigration   : reçoit (source) >
+Bibliotheque "1" o-- "0..*" DemandeMigration   : reçoit (cible) >
+
+' ═══════════════════════════════════════════════════════════
+' RELATIONS – Repositories → Entities
+' ═══════════════════════════════════════════════════════════
+
+BibliothequeRepository     ..> Bibliotheque      : gère
+UtilisateurRepository      ..> Utilisateur       : gère
+LivreRepository            ..> Livre             : gère
+ExemplaireRepository       ..> Exemplaire        : gère
+PretRepository             ..> Pret              : gère
+DemandeMigrationRepository ..> DemandeMigration  : gère
+
+' ═══════════════════════════════════════════════════════════
+' RELATIONS – Services → Repositories
+' ═══════════════════════════════════════════════════════════
+
+PretService      --> PretRepository
+PretService      --> ExemplaireRepository
+LivreService     --> LivreRepository
+LivreService     --> GoogleBooksService
+UtilisateurService --> UtilisateurRepository
+MigrationService --> DemandeMigrationRepository
+MigrationService --> UtilisateurRepository
+
+' ═══════════════════════════════════════════════════════════
+' RELATIONS – Controllers → Services
+' ═══════════════════════════════════════════════════════════
+
+LivreController      --> LivreService
+PretController       --> PretService
+UtilisateurController --> UtilisateurService
+MigrationController  --> MigrationService
+
+@enduml

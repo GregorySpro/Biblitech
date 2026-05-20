@@ -1,0 +1,19 @@
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # Injection de la clé API Google Books dans le service
+    App\Service\GoogleBooksService:
+        arguments:
+            $apiKey: '%env(GOOGLE_BOOKS_API_KEY)%'
