@@ -18,6 +18,7 @@ import { LoadingState } from '../components/LoadingState'
 import { BottomSheet } from '../components/BottomSheet'
 import { useApiCall } from '../hooks/useApiCall'
 import { utilisateurService } from '../services/utilisateurService'
+import { validators, errorMessages } from '../utils/validators'
 import type { Column } from '../components/DataTable'
 import type { Utilisateur } from '../types'
 
@@ -102,14 +103,38 @@ export function AdherentsPage() {
   }
 
   const handleFormSubmit = async () => {
-    if (!formData.nom.trim() || !formData.prenom.trim() || !formData.email.trim()) {
-      setFormError('Nom, prénom et email sont obligatoires')
-      return
+    const errors: string[] = []
+
+    // Validation
+    if (!formData.nom.trim()) {
+      errors.push('Nom obligatoire')
+    } else if (!validators.isValidName(formData.nom)) {
+      errors.push(errorMessages.name)
     }
+
+    if (!formData.prenom.trim()) {
+      errors.push('Prénom obligatoire')
+    } else if (!validators.isValidName(formData.prenom)) {
+      errors.push(errorMessages.name)
+    }
+
+    if (!formData.email.trim()) {
+      errors.push('Email obligatoire')
+    } else if (!validators.isValidEmail(formData.email)) {
+      errors.push(errorMessages.email)
+    }
+
     if (!isEditing && !formData.mot_de_passe?.trim()) {
-      setFormError('Mot de passe requis pour créer un compte')
+      errors.push('Mot de passe requis pour créer un compte')
+    } else if (!isEditing && formData.mot_de_passe && !validators.isStrongPassword(formData.mot_de_passe)) {
+      errors.push(errorMessages.password)
+    }
+
+    if (errors.length > 0) {
+      setFormError(errors.join(' • '))
       return
     }
+
     setFormSaving(true)
     try {
       setFormError(null)

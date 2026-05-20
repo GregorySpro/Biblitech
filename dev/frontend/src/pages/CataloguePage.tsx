@@ -19,6 +19,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
 import { livreService } from '../services/livreService'
 import { exemplaireService } from '../services/exemplaireService'
+import { validators, errorMessages } from '../utils/validators'
 import type { Column } from '../components/DataTable'
 import type { Livre, Exemplaire } from '../types'
 
@@ -135,10 +136,32 @@ export function CataloguePage() {
 
   // Handle form submission (create or update)
   const handleFormSubmit = async () => {
-    if (!formData.isbn.trim() || !formData.titre.trim()) {
-      setIsbnError('ISBN et titre sont obligatoires')
+    const errors: string[] = []
+
+    // Validation
+    if (!formData.isbn.trim()) {
+      errors.push('ISBN obligatoire')
+    } else if (!validators.isValidISBN(formData.isbn)) {
+      errors.push(errorMessages.isbn)
+    }
+
+    if (!formData.titre.trim()) {
+      errors.push('Titre obligatoire')
+    }
+
+    if (formData.auteur.trim() && !validators.isValidName(formData.auteur)) {
+      errors.push(errorMessages.name)
+    }
+
+    if (!validators.isValidYear(formData.annee_publication)) {
+      errors.push(errorMessages.year)
+    }
+
+    if (errors.length > 0) {
+      setIsbnError(errors.join(' • '))
       return
     }
+
     setFormSaving(true)
     try {
       setIsbnError(null)
@@ -176,6 +199,12 @@ export function CataloguePage() {
       setIsbnError('Code exemplaire obligatoire')
       return
     }
+
+    if (!validators.isValidCode(codeExemplaire.trim())) {
+      setIsbnError(errorMessages.code)
+      return
+    }
+
     setExemplaireSaving(true)
     try {
       setIsbnError(null)
