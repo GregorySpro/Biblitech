@@ -15,6 +15,8 @@ import { PageLayout } from '../components/PageLayout'
 import { SearchBar } from '../components/SearchBar'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
+import { ErrorAlert } from '../components/ErrorAlert'
+import { LoadingState } from '../components/LoadingState'
 import { BottomSheet } from '../components/BottomSheet'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
@@ -115,7 +117,7 @@ export function PretsPage() {
               {isAdherent ? 'Mes prêts' : 'Prêts / Retours'}
             </h1>
             <p className="text-sm text-[#6B7280] mt-0.5">
-              {loading ? 'Chargement...' : (
+              {loading ? 'Chargement...' : error ? 'Erreur de chargement' : (
                 <>
                   {sourcePrets.filter(p => p.statut === 'en_cours').length} prêts en cours ·{' '}
                   <span className="text-red-500 font-medium">
@@ -126,6 +128,15 @@ export function PretsPage() {
             </p>
           </div>
         </motion.div>
+
+        {/* Affichage des erreurs */}
+        {error && (
+          <ErrorAlert
+            message="Erreur de chargement"
+            details="Impossible de charger les prêts. Veuillez réessayer."
+            onDismiss={() => {}}
+          />
+        )}
 
         {/* Recherche + filtres */}
         <div className="flex flex-col gap-3 flex-shrink-0">
@@ -162,13 +173,17 @@ export function PretsPage() {
 
           {/* Table + actions */}
           <div className="flex flex-col flex-1 min-w-0 gap-3">
-            <DataTable
-              columns={columns}
-              data={filtered}
-              selectedId={selected?.id ?? null}
-              onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
-              emptyMessage="Aucun prêt ne correspond à votre recherche."
-            />
+            {loading ? (
+              <LoadingState message="Chargement des prêts..." />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={filtered}
+                selectedId={selected?.id ?? null}
+                onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
+                emptyMessage="Aucun prêt ne correspond à votre recherche."
+              />
+            )}
 
             {/* Actions */}
             <div className="flex items-center gap-2.5 flex-shrink-0 pt-1">
