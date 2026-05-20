@@ -13,6 +13,8 @@ import { PageLayout } from '../components/PageLayout'
 import { SearchBar } from '../components/SearchBar'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
+import { ErrorAlert } from '../components/ErrorAlert'
+import { LoadingState } from '../components/LoadingState'
 import { BottomSheet } from '../components/BottomSheet'
 import { useApiCall } from '../hooks/useApiCall'
 import { utilisateurService } from '../services/utilisateurService'
@@ -77,10 +79,19 @@ export function AdherentsPage() {
               Adhérents
             </h1>
             <p className="text-sm text-[#6B7280] mt-0.5">
-              {mockAdherents.filter(u => u.actif).length} actifs sur {mockAdherents.length} inscrits
+              {loading ? 'Chargement...' : error ? 'Erreur' : `${utilisateurs.filter(u => u.actif).length} actifs sur ${utilisateurs.length} inscrits`}
             </p>
           </div>
         </motion.div>
+
+        {/* Affichage des erreurs */}
+        {error && (
+          <ErrorAlert
+            message="Erreur de chargement"
+            details="Impossible de charger la liste des adhérents. Veuillez réessayer."
+            onDismiss={() => {}}
+          />
+        )}
 
         {/* Barre de recherche */}
         <SearchBar
@@ -94,13 +105,17 @@ export function AdherentsPage() {
 
           {/* Table + actions */}
           <div className="flex flex-col flex-1 min-w-0 gap-3">
-            <DataTable
-              columns={columns}
-              data={filtered}
-              selectedId={selected?.id ?? null}
-              onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
-              emptyMessage="Aucun adhérent ne correspond à votre recherche."
-            />
+            {loading ? (
+              <LoadingState message="Chargement des adhérents..." />
+            ) : (
+              <DataTable
+                columns={columns}
+                data={filtered}
+                selectedId={selected?.id ?? null}
+                onRowClick={row => setSelected(row.id === selected?.id ? null : row)}
+                emptyMessage="Aucun adhérent ne correspond à votre recherche."
+              />
+            )}
 
             {/* Boutons d'action */}
             <div className="flex items-center gap-2.5 flex-shrink-0 pt-1">
