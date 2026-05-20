@@ -16,6 +16,8 @@ import { PageLayout } from '../components/PageLayout'
 import { StatCard } from '../components/StatCard'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
+import { ErrorAlert } from '../components/ErrorAlert'
+import { LoadingState } from '../components/LoadingState'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
 import { pretService } from '../services/pretService'
@@ -42,6 +44,22 @@ interface PretRow {
   statut: Pret['statut']
 }
 
+interface MonPretRow {
+  id: number
+  livre: string
+  auteur: string
+  exemplaire: string
+  datePret: string
+  dateRetourPrevue: string
+  statut: Pret['statut']
+}
+
+const statutLabel: Record<Pret['statut'], { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+  en_cours:  { label: 'En cours',  variant: 'info'    },
+  rendu:     { label: 'Rendu',     variant: 'success' },
+  en_retard: { label: 'En retard', variant: 'danger'  },
+}
+
 // ── Colonnes ───────────────────────────────────────────────
 const colsRetards: Column<RetardRow>[] = [
   { key: 'adherent',         header: 'Adhérent',     sortable: true },
@@ -54,12 +72,6 @@ const colsRetards: Column<RetardRow>[] = [
     <Badge label={`${r.joursRetard}j`} variant={r.joursRetard > 10 ? 'danger' : r.joursRetard > 5 ? 'warning' : 'neutral'} dot />
   )},
 ]
-
-const statutLabel: Record<Pret['statut'], { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
-  en_cours:  { label: 'En cours',  variant: 'info'    },
-  rendu:     { label: 'Rendu',     variant: 'success' },
-  en_retard: { label: 'En retard', variant: 'danger'  },
-}
 
 const colsDerniers: Column<PretRow>[] = [
   { key: 'adherent',         header: 'Adhérent',     sortable: true },
@@ -94,19 +106,20 @@ const colsMesPrets: Column<MonPretRow>[] = [
 export function DashboardPage() {
   const [selectedRetard, setSelectedRetard]   = useState<number | null>(null)
   const [selectedDernier, setSelectedDernier] = useState<number | null>(null)
+  const [selectedPret, setSelectedPret]       = useState<number | null>(null)
   const { user } = useAuth()
 
   const isAdherent = user?.role === 'adherent'
   const prenom = user?.email?.split('@')[0] ?? 'vous'
 
   // Fetch stats for staff, loans for members
-  const { data: stats, loading: statsLoading } = useApiCall(
+  const { data: stats, loading: statsLoading, error: statsError } = useApiCall(
     () => statsService.getLibrary(),
     !isAdherent
   )
 
   // Fetch loans
-  const { data: allPrets = [], loading: pretsLoading } = useApiCall(() => pretService.getAll())
+  const { data: allPrets = [], loading: pretsLoading, error: pretsError } = useApiCall(() => pretService.getAll())
 
   // If member, filter to own loans
   const myPrets = isAdherent
@@ -116,6 +129,10 @@ export function DashboardPage() {
   const mesPretsenCours  = myPrets.filter(p => p.statut === 'en_cours').length
   const mesPretsenRetard = myPrets.filter(p => p.statut === 'en_retard').length
   const mesPretsRendus   = myPrets.filter(p => p.statut === 'rendu').length
+
+  // Mock data for staff tables (TODO: replace with real data transformation)
+  const mockRetards: RetardRow[] = []
+  const mockDerniersPrets: PretRow[] = []
 
   return (
     <PageLayout>
@@ -137,6 +154,22 @@ export function DashboardPage() {
           </p>
         </motion.div>
 
+        {/* Affichage des erreurs */}
+        {pretsError && (
+          <ErrorAlert
+            message="Erreur de chargement"
+            details="Impossible de charger les prêts. Veuillez réessayer."
+            onDismiss={() => {}}
+          />
+        )}
+        {!isAdherent && statsError && (
+          <ErrorAlert
+            message="Erreur de chargement des statistiques"
+            details="Impossible de charger les statistiques de la bibliothèque."
+            onDismiss={() => {}}
+          />
+        )}
+
         {isAdherent ? (
           /* ════════════════════════════════════════════════
              VUE ADHÉRENT
@@ -157,13 +190,17 @@ export function DashboardPage() {
                   Mes emprunts
                 </h2>
               </div>
-              <DataTable
-                columns={colsMesPrets}
-                data={mockMesPrets}
-                selectedId={selectedPret}
-                onRowClick={r => setSelectedPret(r.id === selectedPret ? null : r.id)}
-                emptyMessage="Vous n'avez aucun emprunt en cours."
-              />
+              {pretsLoading ? (
+                <LoadingState message="Chargement de vos prêts..." />
+              ) : (
+                <DataTable
+                  columns={colsMesPrets}
+                  data={myPrets as unknown as MonPretRow[]}
+                  selectedId={selectedPret}
+                  onRowClick={r => setSelectedPret(r.id === selectedPret ? null : r.id)}
+                  emptyMessage="Vous n'avez aucun emprunt en cours."
+                />
+              )}
             </div>
 
             {/* Raccourcis */}
@@ -218,12 +255,16 @@ export function DashboardPage() {
                   <h2 style={{ fontFamily: 'var(--font-display)' }} className="text-sm font-semibold text-[#374151]">Prêts en retard</h2>
                   <span className="ml-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">{mockRetards.length}</span>
                 </div>
-                <DataTable
-                  columns={colsRetards}
-                  data={mockRetards}
-                  selectedId={selectedRetard}
-                  onRowClick={r => setSelectedRetard(r.id === selectedRetard ? null : r.id)}
-                />
+                {pretsLoading ? (
+                  <LoadingState message="Chargement des prêts..." />
+                ) : (
+                  <DataTable
+                    columns={colsRetards}
+                    data={mockRetards}
+                    selectedId={selectedRetard}
+                    onRowClick={r => setSelectedRetard(r.id === selectedRetard ? null : r.id)}
+                  />
+                )}
               </div>
 
               <div className="flex flex-col flex-1 gap-3">
@@ -231,12 +272,16 @@ export function DashboardPage() {
                   <CalendarDaysIcon className="w-4 h-4 text-[#1E3A8A]" />
                   <h2 style={{ fontFamily: 'var(--font-display)' }} className="text-sm font-semibold text-[#374151]">Derniers prêts enregistrés</h2>
                 </div>
-                <DataTable
-                  columns={colsDerniers}
-                  data={mockDerniersPrets}
-                  selectedId={selectedDernier}
-                  onRowClick={r => setSelectedDernier(r.id === selectedDernier ? null : r.id)}
-                />
+                {pretsLoading ? (
+                  <LoadingState message="Chargement des prêts..." />
+                ) : (
+                  <DataTable
+                    columns={colsDerniers}
+                    data={mockDerniersPrets}
+                    selectedId={selectedDernier}
+                    onRowClick={r => setSelectedDernier(r.id === selectedDernier ? null : r.id)}
+                  />
+                )}
               </div>
 
             </div>
