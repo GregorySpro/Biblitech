@@ -14,6 +14,8 @@ import { SearchBar } from '../components/SearchBar'
 import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
 import { BottomSheet } from '../components/BottomSheet'
+import { useApiCall } from '../hooks/useApiCall'
+import { utilisateurService } from '../services/utilisateurService'
 import type { Column } from '../components/DataTable'
 import type { Utilisateur } from '../types'
 
@@ -22,22 +24,6 @@ const roleLabelMap: Record<string, { label: string; variant: 'info' | 'warning' 
   bibliothecaire: { label: 'Bibliothécaire', variant: 'info'    },
   adherent:       { label: 'Adhérent',       variant: 'neutral' },
 }
-
-// ── Mock data ──────────────────────────────────────────────
-const mockAdherents: Utilisateur[] = [
-  { id: 1,  nom: 'Martin',   prenom: 'Sophie',     email: 'sophie.martin@mail.fr',    role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2025-09-12' },
-  { id: 2,  nom: 'Dupont',   prenom: 'Marc',       email: 'marc.dupont@mail.fr',      role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2025-10-05' },
-  { id: 3,  nom: 'Bernard',  prenom: 'Léa',        email: 'lea.bernard@mail.fr',      role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2025-11-18' },
-  { id: 4,  nom: 'Thomas',   prenom: 'Jean-Paul',  email: 'jp.thomas@mail.fr',        role: 'adherent',       actif: false, bibliotheque_id: 1, date_inscription: '2025-08-03' },
-  { id: 5,  nom: 'Robert',   prenom: 'Claire',     email: 'claire.robert@mail.fr',    role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2025-12-22' },
-  { id: 6,  nom: 'Leclerc',  prenom: 'Emma',       email: 'emma.leclerc@mail.fr',     role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2026-01-08' },
-  { id: 7,  nom: 'Moreau',   prenom: 'Antoine',    email: 'a.moreau@mail.fr',         role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2026-01-15' },
-  { id: 8,  nom: 'Simon',    prenom: 'Julie',      email: 'j.simon@mail.fr',          role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2026-02-01' },
-  { id: 9,  nom: 'Laurent',  prenom: 'Paul',       email: 'paul.laurent@mail.fr',     role: 'bibliothecaire', actif: true,  bibliotheque_id: 1, date_inscription: '2024-06-10' },
-  { id: 10, nom: 'Garcia',   prenom: 'Nina',       email: 'nina.garcia@mail.fr',      role: 'adherent',       actif: true,  bibliotheque_id: 1, date_inscription: '2026-02-14' },
-  { id: 11, nom: 'Petit',    prenom: 'Maxime',     email: 'maxime.petit@mail.fr',     role: 'adherent',       actif: false, bibliotheque_id: 1, date_inscription: '2025-07-30' },
-  { id: 12, nom: 'Durand',   prenom: 'Isabelle',   email: 'i.durand@mail.fr',         role: 'admin',          actif: true,  bibliotheque_id: 1, date_inscription: '2024-01-01' },
-]
 
 const columns: Column<Utilisateur>[] = [
   { key: 'nom',    header: 'Nom',      sortable: true, render: r => (
@@ -62,15 +48,18 @@ export function AdherentsPage() {
   const [search, setSearch]   = useState('')
   const [selected, setSelected] = useState<Utilisateur | null>(null)
 
+  // Fetch users from API
+  const { data: utilisateurs = [], loading, error } = useApiCall(() => utilisateurService.getAll())
+
   const filtered = useMemo(() => {
-    if (!search) return mockAdherents
+    if (!search) return utilisateurs
     const q = search.toLowerCase()
-    return mockAdherents.filter(u =>
+    return utilisateurs.filter(u =>
       u.nom.toLowerCase().includes(q) ||
       u.prenom.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
     )
-  }, [search])
+  }, [search, utilisateurs])
 
   return (
     <PageLayout>

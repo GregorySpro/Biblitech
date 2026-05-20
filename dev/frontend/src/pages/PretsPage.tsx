@@ -17,6 +17,8 @@ import { DataTable } from '../components/DataTable'
 import { Badge } from '../components/Badge'
 import { BottomSheet } from '../components/BottomSheet'
 import { useAuth } from '../hooks/useAuth'
+import { useApiCall } from '../hooks/useApiCall'
+import { pretService } from '../services/pretService'
 import type { Column } from '../components/DataTable'
 import type { Pret } from '../types'
 
@@ -32,20 +34,6 @@ const statutConfig: Record<Pret['statut'], { label: string; variant: 'info' | 's
   rendu:     { label: 'Rendu',     variant: 'success' },
   en_retard: { label: 'En retard', variant: 'danger'  },
 }
-
-// ── Mock data ──────────────────────────────────────────────
-const mockPrets: PretRow[] = [
-  { id: 1,  date_pret: '2026-04-06', date_retour_prevue: '2026-04-20', date_retour_effective: null,         statut: 'en_cours',  exemplaire_id: 42, utilisateur_id: 1,  adherentNom: 'Martin Sophie',    livretitre: 'Le Petit Prince',              codeExemplaire: 'EX-042' },
-  { id: 2,  date_pret: '2026-04-05', date_retour_prevue: '2026-04-19', date_retour_effective: null,         statut: 'en_cours',  exemplaire_id: 11, utilisateur_id: 2,  adherentNom: 'Dupont Marc',      livretitre: "L'Étranger",                   codeExemplaire: 'EX-011' },
-  { id: 3,  date_pret: '2026-04-04', date_retour_prevue: '2026-04-18', date_retour_effective: null,         statut: 'en_cours',  exemplaire_id: 78, utilisateur_id: 3,  adherentNom: 'Bernard Léa',      livretitre: 'Les Misérables T.1',           codeExemplaire: 'EX-078' },
-  { id: 4,  date_pret: '2026-04-02', date_retour_prevue: '2026-04-16', date_retour_effective: '2026-04-14', statut: 'rendu',     exemplaire_id: 91, utilisateur_id: 7,  adherentNom: 'Moreau Antoine',   livretitre: '1984',                         codeExemplaire: 'EX-091' },
-  { id: 5,  date_pret: '2026-04-01', date_retour_prevue: '2026-04-15', date_retour_effective: '2026-04-13', statut: 'rendu',     exemplaire_id: 56, utilisateur_id: 8,  adherentNom: 'Simon Julie',      livretitre: 'Dune',                         codeExemplaire: 'EX-056' },
-  { id: 6,  date_pret: '2026-03-25', date_retour_prevue: '2026-04-08', date_retour_effective: null,         statut: 'en_retard', exemplaire_id: 33, utilisateur_id: 4,  adherentNom: 'Thomas Jean-Paul', livretitre: 'Le Comte de Monte-Cristo',    codeExemplaire: 'EX-033' },
-  { id: 7,  date_pret: '2026-03-22', date_retour_prevue: '2026-04-05', date_retour_effective: null,         statut: 'en_retard', exemplaire_id: 19, utilisateur_id: 5,  adherentNom: 'Robert Claire',    livretitre: 'Madame Bovary',                codeExemplaire: 'EX-019' },
-  { id: 8,  date_pret: '2026-03-20', date_retour_prevue: '2026-04-03', date_retour_effective: '2026-04-09', statut: 'rendu',     exemplaire_id: 67, utilisateur_id: 10, adherentNom: 'Garcia Nina',      livretitre: 'Harry Potter à l\'école des sorciers', codeExemplaire: 'EX-067' },
-  { id: 9,  date_pret: '2026-04-03', date_retour_prevue: '2026-04-17', date_retour_effective: null,         statut: 'en_cours',  exemplaire_id: 88, utilisateur_id: 6,  adherentNom: 'Leclerc Emma',     livretitre: 'Fondation',                    codeExemplaire: 'EX-088' },
-  { id: 10, date_pret: '2026-03-15', date_retour_prevue: '2026-03-29', date_retour_effective: null,         statut: 'en_retard', exemplaire_id: 24, utilisateur_id: 11, adherentNom: 'Petit Maxime',     livretitre: "L'Alchimiste",                 codeExemplaire: 'EX-024' },
-]
 
 type FilterStatut = 'tous' | Pret['statut']
 
@@ -87,10 +75,13 @@ export function PretsPage() {
   const isAdherent = user?.role === 'adherent'
   const canManage  = !isAdherent
 
-  // L'adhérent ne voit que ses propres prêts
+  // Fetch loans from API
+  const { data: allPrets = [], loading, error } = useApiCall(() => pretService.getAll())
+
+  // Member sees only their own loans
   const sourcePrets = isAdherent
-    ? mockPrets.filter(p => p.utilisateur_id === user?.sub)
-    : mockPrets
+    ? (allPrets as unknown as PretRow[]).filter(p => p.utilisateur_id === user?.sub)
+    : (allPrets as unknown as PretRow[])
 
   const columns = isAdherent ? columnsAdherent : columnsStaff
 
@@ -101,9 +92,9 @@ export function PretsPage() {
         if (!search) return true
         const q = search.toLowerCase()
         return (
-          p.adherentNom.toLowerCase().includes(q) ||
-          p.livretitre.toLowerCase().includes(q) ||
-          p.codeExemplaire.toLowerCase().includes(q)
+          p.adherentNom?.toLowerCase().includes(q) ||
+          p.livretitre?.toLowerCase().includes(q) ||
+          p.codeExemplaire?.toLowerCase().includes(q)
         )
       })
   }, [search, filter, sourcePrets])
@@ -124,10 +115,14 @@ export function PretsPage() {
               {isAdherent ? 'Mes prêts' : 'Prêts / Retours'}
             </h1>
             <p className="text-sm text-[#6B7280] mt-0.5">
-              {sourcePrets.filter(p => p.statut === 'en_cours').length} prêts en cours ·{' '}
-              <span className="text-red-500 font-medium">
-                {sourcePrets.filter(p => p.statut === 'en_retard').length} en retard
-              </span>
+              {loading ? 'Chargement...' : (
+                <>
+                  {sourcePrets.filter(p => p.statut === 'en_cours').length} prêts en cours ·{' '}
+                  <span className="text-red-500 font-medium">
+                    {sourcePrets.filter(p => p.statut === 'en_retard').length} en retard
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </motion.div>
@@ -154,7 +149,7 @@ export function PretsPage() {
                 {btn.label}
                 {btn.key !== 'tous' && (
                   <span className="ml-1.5 text-[#9CA3AF]">
-                    ({mockPrets.filter(p => p.statut === btn.key).length})
+                    ({sourcePrets.filter(p => p.statut === btn.key).length})
                   </span>
                 )}
               </button>
