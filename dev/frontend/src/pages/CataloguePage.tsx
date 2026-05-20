@@ -43,6 +43,8 @@ export function CataloguePage() {
   const [selected, setSelected]     = useState<Livre | null>(null)
   const [isbnSearch, setIsbnSearch] = useState('')
   const [isbnError, setIsbnError]   = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const { user } = useAuth()
   const canEdit = user?.role !== 'adherent'
 
@@ -62,6 +64,22 @@ export function CataloguePage() {
       setIsbnSearch('')
     } catch (err) {
       setIsbnError(err instanceof Error ? err.message : 'ISBN non trouvé')
+    }
+  }
+
+  // Handle book deletion
+  const handleDeleteBook = async () => {
+    if (!selected) return
+    setDeleting(true)
+    try {
+      await livreService.delete(selected.id)
+      setSelected(null)
+      setShowDeleteConfirm(false)
+      await refetch()
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -178,6 +196,7 @@ export function CataloguePage() {
                 </button>
                 <button
                   disabled={!selected}
+                  onClick={() => setShowDeleteConfirm(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-white text-sm font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <TrashIcon className="w-4 h-4" />
@@ -266,6 +285,48 @@ export function CataloguePage() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* ── Confirmation delete modal ── */}
+        <AnimatePresence>
+          {showDeleteConfirm && selected && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+              onClick={() => !deleting && setShowDeleteConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold text-[#111827] mb-2">Supprimer ce livre ?</h3>
+                <p className="text-sm text-[#6B7280] mb-6">
+                  Vous êtes sur le point de supprimer "<strong>{selected.titre}</strong>". Cette action ne peut pas être annulée.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    disabled={deleting}
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 px-4 py-2 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    disabled={deleting}
+                    onClick={handleDeleteBook}
+                    className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {deleting ? '...' : 'Supprimer'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </PageLayout>
   )
