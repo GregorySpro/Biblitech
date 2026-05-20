@@ -45,6 +45,18 @@ export function CataloguePage() {
   const [isbnError, setIsbnError]   = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [showFormModal, setShowFormModal] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [formSaving, setFormSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    isbn: '',
+    titre: '',
+    auteur: '',
+    editeur: '',
+    annee_publication: new Date().getFullYear(),
+    genre: '',
+    resume: '',
+  })
   const { user } = useAuth()
   const canEdit = user?.role !== 'adherent'
 
@@ -80,6 +92,61 @@ export function CataloguePage() {
       setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Handle form open for adding new book
+  const handleOpenAddForm = () => {
+    setFormData({
+      isbn: '',
+      titre: '',
+      auteur: '',
+      editeur: '',
+      annee_publication: new Date().getFullYear(),
+      genre: '',
+      resume: '',
+    })
+    setIsEditing(false)
+    setShowFormModal(true)
+  }
+
+  // Handle form open for editing selected book
+  const handleOpenEditForm = () => {
+    if (!selected) return
+    setFormData({
+      isbn: selected.isbn,
+      titre: selected.titre,
+      auteur: selected.auteur,
+      editeur: selected.editeur,
+      annee_publication: selected.annee_publication,
+      genre: selected.genre,
+      resume: selected.resume,
+    })
+    setIsEditing(true)
+    setShowFormModal(true)
+  }
+
+  // Handle form submission (create or update)
+  const handleFormSubmit = async () => {
+    if (!formData.isbn.trim() || !formData.titre.trim()) {
+      setIsbnError('ISBN et titre sont obligatoires')
+      return
+    }
+    setFormSaving(true)
+    try {
+      setIsbnError(null)
+      if (isEditing && selected) {
+        await livreService.update(selected.id, formData)
+      } else {
+        await livreService.create(formData)
+      }
+      setShowFormModal(false)
+      setSelected(null)
+      await refetch()
+    } catch (err) {
+      setIsbnError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement')
+    } finally {
+      setFormSaving(false)
     }
   }
 
@@ -183,12 +250,15 @@ export function CataloguePage() {
             {/* Actions (right-down-left-down-part) */}
             {canEdit && (
               <div className="flex items-center gap-2.5 flex-shrink-0 pt-1">
-                <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-sm font-semibold hover:bg-[#1e40af] transition-all duration-200 shadow-sm hover:shadow-md shadow-[#1E3A8A]/20">
+                <button
+                  onClick={handleOpenAddForm}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1E3A8A] text-white text-sm font-semibold hover:bg-[#1e40af] transition-all duration-200 shadow-sm hover:shadow-md shadow-[#1E3A8A]/20">
                   <PlusIcon className="w-4 h-4" />
                   Ajouter un livre
                 </button>
                 <button
                   disabled={!selected}
+                  onClick={handleOpenEditForm}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <PencilSquareIcon className="w-4 h-4" />
@@ -321,6 +391,138 @@ export function CataloguePage() {
                     className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
                   >
                     {deleting ? '...' : 'Supprimer'}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Add/Edit form modal ── */}
+        <AnimatePresence>
+          {showFormModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+              onClick={() => !formSaving && setShowFormModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-white rounded-xl shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <h3 className="text-lg font-semibold text-[#111827] mb-6">{isEditing ? 'Modifier le livre' : 'Ajouter un livre'}</h3>
+
+                <div className="space-y-4 mb-6">
+                  {/* ISBN */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">ISBN *</label>
+                    <input
+                      type="text"
+                      value={formData.isbn}
+                      onChange={e => setFormData({ ...formData, isbn: e.target.value })}
+                      placeholder="ISBN"
+                      disabled={formSaving}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* Titre */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Titre *</label>
+                    <input
+                      type="text"
+                      value={formData.titre}
+                      onChange={e => setFormData({ ...formData, titre: e.target.value })}
+                      placeholder="Titre du livre"
+                      disabled={formSaving}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* Auteur & Éditeur */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-[#374151] mb-1">Auteur</label>
+                      <input
+                        type="text"
+                        value={formData.auteur}
+                        onChange={e => setFormData({ ...formData, auteur: e.target.value })}
+                        placeholder="Nom de l'auteur"
+                        disabled={formSaving}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#374151] mb-1">Éditeur</label>
+                      <input
+                        type="text"
+                        value={formData.editeur}
+                        onChange={e => setFormData({ ...formData, editeur: e.target.value })}
+                        placeholder="Éditeur"
+                        disabled={formSaving}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Année & Genre */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-[#374151] mb-1">Année de publication</label>
+                      <input
+                        type="number"
+                        value={formData.annee_publication}
+                        onChange={e => setFormData({ ...formData, annee_publication: parseInt(e.target.value) })}
+                        disabled={formSaving}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-[#374151] mb-1">Genre</label>
+                      <input
+                        type="text"
+                        value={formData.genre}
+                        onChange={e => setFormData({ ...formData, genre: e.target.value })}
+                        placeholder="Genre"
+                        disabled={formSaving}
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Résumé */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Résumé</label>
+                    <textarea
+                      value={formData.resume}
+                      onChange={e => setFormData({ ...formData, resume: e.target.value })}
+                      placeholder="Description du livre"
+                      disabled={formSaving}
+                      rows={4}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50 resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    disabled={formSaving}
+                    onClick={() => setShowFormModal(false)}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    disabled={formSaving}
+                    onClick={handleFormSubmit}
+                    className="flex-1 px-4 py-2.5 rounded-lg bg-[#1E3A8A] text-white text-sm font-medium hover:bg-[#1e40af] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {formSaving ? '...' : isEditing ? 'Modifier' : 'Ajouter'}
                   </button>
                 </div>
               </motion.div>
