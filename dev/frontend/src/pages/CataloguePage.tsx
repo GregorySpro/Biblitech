@@ -69,12 +69,17 @@ export function CataloguePage() {
   const canEdit = user?.role !== 'adherent'
 
   // Fetch books from API
-  const { data: livres = [], loading, error, refetch } = useApiCall(() => livreService.getAll())
+  const { data: livresData, loading, error, refetch } = useApiCall(() => livreService.getAll())
+  const livres = livresData ?? []
 
   // Handle ISBN search
   const handleIsbnSearch = async () => {
     if (!isbnSearch.trim()) {
       setIsbnError('Veuillez entrer un ISBN')
+      return
+    }
+    if (!validators.isValidISBN(isbnSearch.trim())) {
+      setIsbnError(errorMessages.isbn)
       return
     }
     try {

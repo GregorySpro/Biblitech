@@ -4,7 +4,6 @@ security:
             algorithm: argon2id
             memory_cost: 65536
             time_cost: 4
-            threads: 1
 
     providers:
         utilisateur_provider:
@@ -33,8 +32,9 @@ security:
             jwt: ~
 
     access_control:
-        - { path: ^/api/login, roles: PUBLIC_ACCESS }
-        - { path: ^/api,       roles: IS_AUTHENTICATED_FULLY }
+        - { path: ^/api/login,         roles: PUBLIC_ACCESS }
+        - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
+        - { path: ^/api,               roles: IS_AUTHENTICATED_FULLY }
 
 when@test:
     security:

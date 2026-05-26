@@ -4,8 +4,3 @@ lexik_jwt_authentication:
     pass_phrase: '%env(JWT_PASSPHRASE)%'
     token_ttl: 28800  # 8 heures (en secondes)
     user_id_claim: sub
-
-    # Payload supplémentaire inclus dans le token
-    additional_payload:
-        - role
-        - bibliotheque_id

@@ -60,6 +60,49 @@ const statutLabel: Record<Pret['statut'], { label: string; variant: 'success' | 
   en_retard: { label: 'En retard', variant: 'danger'  },
 }
 
+// ── Mapping Pret → lignes d'affichage ────────────────────
+function mapPretToMonPretRow(p: Pret): MonPretRow {
+  return {
+    id:               p.id,
+    livre:            p.exemplaire?.livre?.titre           ?? `Livre #${p.exemplaire_id}`,
+    auteur:           p.exemplaire?.livre?.auteur          ?? '',
+    exemplaire:       p.exemplaire?.code_exemplaire        ?? `EX-${p.exemplaire_id}`,
+    datePret:         p.date_pret,
+    dateRetourPrevue: p.date_retour_prevue,
+    statut:           p.statut,
+  }
+}
+
+function mapPretToRetardRow(p: Pret): RetardRow {
+  const joursRetard = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(p.date_retour_prevue).getTime()) / 86_400_000),
+  )
+  return {
+    id:               p.id,
+    adherent:         p.utilisateur
+                        ? `${p.utilisateur.prenom} ${p.utilisateur.nom}`
+                        : `Adhérent #${p.utilisateur_id}`,
+    livre:            p.exemplaire?.livre?.titre    ?? `Livre #${p.exemplaire_id}`,
+    exemplaire:       p.exemplaire?.code_exemplaire ?? `EX-${p.exemplaire_id}`,
+    dateRetourPrevue: new Date(p.date_retour_prevue).toLocaleDateString('fr-FR'),
+    joursRetard,
+  }
+}
+
+function mapPretToPretRow(p: Pret): PretRow {
+  return {
+    id:               p.id,
+    adherent:         p.utilisateur
+                        ? `${p.utilisateur.prenom} ${p.utilisateur.nom}`
+                        : `Adhérent #${p.utilisateur_id}`,
+    livre:            p.exemplaire?.livre?.titre ?? `Livre #${p.exemplaire_id}`,
+    datePret:         new Date(p.date_pret).toLocaleDateString('fr-FR'),
+    dateRetourPrevue: new Date(p.date_retour_prevue).toLocaleDateString('fr-FR'),
+    statut:           p.statut,
+  }
+}
+
 // ── Colonnes ───────────────────────────────────────────────
 const colsRetards: Column<RetardRow>[] = [
   { key: 'adherent',         header: 'Adhérent',     sortable: true },
@@ -119,7 +162,8 @@ export function DashboardPage() {
   )
 
   // Fetch loans
-  const { data: allPrets = [], loading: pretsLoading, error: pretsError } = useApiCall(() => pretService.getAll())
+  const { data: allPretsData, loading: pretsLoading, error: pretsError } = useApiCall(() => pretService.getAll())
+  const allPrets = allPretsData ?? []
 
   // If member, filter to own loans
   const myPrets = isAdherent
@@ -131,8 +175,11 @@ export function DashboardPage() {
   const mesPretsRendus   = myPrets.filter(p => p.statut === 'rendu').length
 
   // Mock data for staff tables (TODO: replace with real data transformation)
-  const mockRetards: RetardRow[] = []
-  const mockDerniersPrets: PretRow[] = []
+  const retards       = allPrets.filter(p => p.statut === 'en_retard').map(mapPretToRetardRow)
+  const derniersPrets = [...allPrets]
+    .sort((a, b) => new Date(b.date_pret).getTime() - new Date(a.date_pret).getTime())
+    .slice(0, 10)
+    .map(mapPretToPretRow)
 
   return (
     <PageLayout>
@@ -195,7 +242,7 @@ export function DashboardPage() {
               ) : (
                 <DataTable
                   columns={colsMesPrets}
-                  data={myPrets as unknown as MonPretRow[]}
+                  data={myPrets.map(mapPretToMonPretRow)}
                   selectedId={selectedPret}
                   onRowClick={r => setSelectedPret(r.id === selectedPret ? null : r.id)}
                   emptyMessage="Vous n'avez aucun emprunt en cours."
@@ -253,14 +300,14 @@ export function DashboardPage() {
                 <div className="flex items-center gap-2">
                   <ClockIcon className="w-4 h-4 text-red-500" />
                   <h2 style={{ fontFamily: 'var(--font-display)' }} className="text-sm font-semibold text-[#374151]">Prêts en retard</h2>
-                  <span className="ml-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">{mockRetards.length}</span>
+                  <span className="ml-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 text-xs font-semibold">{retards.length}</span>
                 </div>
                 {pretsLoading ? (
                   <LoadingState message="Chargement des prêts..." />
                 ) : (
                   <DataTable
                     columns={colsRetards}
-                    data={mockRetards}
+                    data={retards}
                     selectedId={selectedRetard}
                     onRowClick={r => setSelectedRetard(r.id === selectedRetard ? null : r.id)}
                   />
@@ -277,7 +324,7 @@ export function DashboardPage() {
                 ) : (
                   <DataTable
                     columns={colsDerniers}
-                    data={mockDerniersPrets}
+                    data={derniersPrets}
                     selectedId={selectedDernier}
                     onRowClick={r => setSelectedDernier(r.id === selectedDernier ? null : r.id)}
                   />

@@ -69,6 +69,19 @@ const filterButtons: { key: FilterStatut; label: string }[] = [
   { key: 'rendu',     label: 'Rendus' },
 ]
 
+// ── Mapping Pret → PretRow ─────────────────────────────────
+function mapPretToPretRow(p: Pret): PretRow {
+  const { exemplaire, utilisateur, ...rest } = p
+  return {
+    ...rest,
+    adherentNom:    utilisateur
+                      ? `${utilisateur.prenom} ${utilisateur.nom}`
+                      : `Adhérent #${p.utilisateur_id}`,
+    livretitre:     exemplaire?.livre?.titre    ?? `Livre #${p.exemplaire_id}`,
+    codeExemplaire: exemplaire?.code_exemplaire ?? `EX-${p.exemplaire_id}`,
+  }
+}
+
 export function PretsPage() {
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState<FilterStatut>('tous')
@@ -84,12 +97,14 @@ export function PretsPage() {
   const canManage  = !isAdherent
 
   // Fetch loans from API
-  const { data: allPrets = [], loading, error, refetch } = useApiCall(() => pretService.getAll())
+  const { data: allPretsData, loading, error, refetch } = useApiCall(() => pretService.getAll())
+  const allPrets = allPretsData ?? []
 
   // Member sees only their own loans
+  const pretRows = allPrets.map(mapPretToPretRow)
   const sourcePrets = isAdherent
-    ? (allPrets as unknown as PretRow[]).filter(p => p.utilisateur_id === user?.sub)
-    : (allPrets as unknown as PretRow[])
+    ? pretRows.filter(p => p.utilisateur_id === user?.sub)
+    : pretRows
 
   const columns = isAdherent ? columnsAdherent : columnsStaff
 
@@ -179,7 +194,7 @@ export function PretsPage() {
           <ErrorAlert
             message="Erreur de chargement"
             details="Impossible de charger les prêts. Veuillez réessayer."
-            onDismiss={() => {}}
+            onDismiss={() => refetch()}
           />
         )}
 
@@ -250,13 +265,6 @@ export function PretsPage() {
                   </button>
                 </>
               )}
-              <button
-                disabled={!selected}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ArrowsRightLeftIcon className="w-4 h-4" />
-                Voir détails
-              </button>
             </div>
           </div>
 

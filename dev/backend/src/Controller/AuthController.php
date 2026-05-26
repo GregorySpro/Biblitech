@@ -2,8 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\Utilisateur;
+use App\Entity\RefreshToken;
+use App\Repository\RefreshTokenRepository;
 use App\Repository\UtilisateurRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,9 +18,11 @@ use Symfony\Component\Routing\Attribute\Route;
 class AuthController extends AbstractController
 {
     public function __construct(
-        private readonly UtilisateurRepository $utilisateurRepository,
+        private readonly UtilisateurRepository  $utilisateurRepository,
+        private readonly RefreshTokenRepository $refreshTokenRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
-        private readonly JWTTokenManagerInterface $jwtManager,
+        private readonly JWTTokenManagerInterface    $jwtManager,
+        private readonly EntityManagerInterface      $em,
     ) {}
 
     #[Route('/login', name: 'api_login', methods: ['POST'])]
@@ -52,22 +56,91 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Générer le JWT avec payload enrichi
-        $token = $this->jwtManager->createFromPayload($utilisateur, [
+        $accessToken = $this->jwtManager->createFromPayload($utilisateur, [
             'sub'             => $utilisateur->getId(),
             'email'           => $utilisateur->getEmail(),
             'role'            => $utilisateur->getRole(),
             'bibliotheque_id' => $utilisateur->getBibliothequeId(),
         ]);
 
-        return $this->json(['token' => $token], Response::HTTP_OK);
+        $refreshToken = new RefreshToken($utilisateur);
+        $this->em->persist($refreshToken);
+        $this->em->flush();
+
+        return $this->json([
+            'token'         => $accessToken,
+            'refresh_token' => $refreshToken->getToken(),
+        ], Response::HTTP_OK);
+    }
+
+    #[Route('/token/refresh', name: 'api_token_refresh', methods: ['POST'])]
+    public function refresh(Request $request): JsonResponse
+    {
+        $data         = json_decode($request->getContent(), true);
+        $rawToken     = $data['refresh_token'] ?? null;
+
+        if (empty($rawToken)) {
+            return $this->json([
+                'status'  => 400,
+                'code'    => 'VALIDATION_ERROR',
+                'message' => 'Le champ refresh_token est obligatoire.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $refreshToken = $this->refreshTokenRepository->findValidToken($rawToken);
+
+        if ($refreshToken === null) {
+            return $this->json([
+                'status'  => 401,
+                'code'    => 'REFRESH_TOKEN_INVALID',
+                'message' => 'Refresh token invalide ou expiré. Veuillez vous reconnecter.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $utilisateur = $refreshToken->getUtilisateur();
+
+        if (!$utilisateur->isActive()) {
+            return $this->json([
+                'status'  => 403,
+                'code'    => 'AUTH_ACCOUNT_DISABLED',
+                'message' => 'Votre compte est désactivé. Contactez un administrateur.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Rotation : supprimer l'ancien refresh token, en créer un nouveau
+        $this->em->remove($refreshToken);
+
+        $newAccessToken = $this->jwtManager->createFromPayload($utilisateur, [
+            'sub'             => $utilisateur->getId(),
+            'email'           => $utilisateur->getEmail(),
+            'role'            => $utilisateur->getRole(),
+            'bibliotheque_id' => $utilisateur->getBibliothequeId(),
+        ]);
+
+        $newRefreshToken = new RefreshToken($utilisateur);
+        $this->em->persist($newRefreshToken);
+        $this->em->flush();
+
+        return $this->json([
+            'token'         => $newAccessToken,
+            'refresh_token' => $newRefreshToken->getToken(),
+        ], Response::HTTP_OK);
     }
 
     #[Route('/logout', name: 'api_logout', methods: ['POST'])]
-    public function logout(): JsonResponse
+    public function logout(Request $request): JsonResponse
     {
-        // Le JWT est stateless : l'invalidation est gérée côté client (suppression du localStorage).
-        // Si une blacklist JWT est nécessaire, elle sera ajoutée ici.
+        $data     = json_decode($request->getContent(), true);
+        $rawToken = $data['refresh_token'] ?? null;
+
+        if (!empty($rawToken)) {
+            $refreshToken = $this->refreshTokenRepository->findValidToken($rawToken);
+            if ($refreshToken !== null) {
+                $this->em->remove($refreshToken);
+                $this->em->flush();
+            }
+        }
+
         return $this->json(['message' => 'Déconnexion réussie.'], Response::HTTP_OK);
     }
 }

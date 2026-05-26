@@ -11,6 +11,12 @@ export interface CreateUtilisateurDTO {
 
 export interface UpdateUtilisateurDTO extends Partial<CreateUtilisateurDTO> {}
 
+function validateId(id: number | undefined): void {
+  if (id === undefined || id <= 0 || !Number.isInteger(id)) {
+    throw new Error('ID invalide')
+  }
+}
+
 export const utilisateurService = {
   // Get current user
   getMe: () =>
@@ -21,18 +27,24 @@ export const utilisateurService = {
     api.get<Utilisateur[]>('/api/utilisateurs', { params }).then(r => r.data),
 
   // Get single user
-  getById: (id: number) =>
-    api.get<Utilisateur>(`/api/utilisateurs/${id}`).then(r => r.data),
+  getById: (id: number) => {
+    validateId(id)
+    return api.get<Utilisateur>(`/api/utilisateurs/${id}`).then(r => r.data)
+  },
 
   // Create user
   create: (data: CreateUtilisateurDTO) =>
     api.post<Utilisateur>('/api/utilisateurs', data).then(r => r.data),
 
   // Update user
-  update: (id: number, data: UpdateUtilisateurDTO) =>
-    api.put<Utilisateur>(`/api/utilisateurs/${id}`, data).then(r => r.data),
+  update: (id: number, data: UpdateUtilisateurDTO) => {
+    validateId(id)
+    return api.put<Utilisateur>(`/api/utilisateurs/${id}`, data).then(r => r.data)
+  },
 
   // Delete user (soft delete / anonymization)
-  delete: (id: number) =>
-    api.delete(`/api/utilisateurs/${id}`).then(r => r.data),
+  delete: (id: number) => {
+    validateId(id)
+    return api.delete(`/api/utilisateurs/${id}`).then(r => r.data)
+  },
 }

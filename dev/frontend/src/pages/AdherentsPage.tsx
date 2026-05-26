@@ -65,12 +65,13 @@ export function AdherentsPage() {
   })
 
   // Fetch users from API
-  const { data: utilisateurs = [], loading, error, refetch } = useApiCall(() => utilisateurService.getAll()) as any
+  const { data: utilisateursData, loading, error, refetch } = useApiCall(() => utilisateurService.getAll())
+  const utilisateurs = utilisateursData ?? []
 
   const filtered = useMemo(() => {
-    if (!search) return (utilisateurs as Utilisateur[])
+    if (!search) return utilisateurs
     const q = search.toLowerCase()
-    return (utilisateurs as Utilisateur[]).filter(u =>
+    return utilisateurs.filter(u =>
       u.nom.toLowerCase().includes(q) ||
       u.prenom.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
@@ -197,7 +198,7 @@ export function AdherentsPage() {
           <ErrorAlert
             message="Erreur de chargement"
             details="Impossible de charger la liste des adhérents. Veuillez réessayer."
-            onDismiss={() => {}}
+            onDismiss={() => refetch()}
           />
         )}
 
@@ -420,9 +421,14 @@ export function AdherentsPage() {
               onClick={e => e.stopPropagation()}
             >
               <h3 className="text-lg font-semibold text-[#111827] mb-2">Supprimer cet adhérent ?</h3>
-              <p className="text-sm text-[#6B7280] mb-6">
+              <p className="text-sm text-[#6B7280] mb-4">
                 Vous êtes sur le point de supprimer le compte de <strong>{selected.prenom} {selected.nom}</strong>. Cette action ne peut pas être annulée.
               </p>
+              {formError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
               <div className="flex gap-3">
                 <button
                   disabled={deleting}

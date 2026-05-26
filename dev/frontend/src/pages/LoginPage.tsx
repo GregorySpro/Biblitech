@@ -45,7 +45,7 @@ export function LoginPage() {
   const navigate  = useNavigate()
 
   const loginDev = (u: typeof devUsers[number]) => {
-    login(makeFakeJwt(u.role, u.sub, u.email, u.bibliotheque_id))
+    login(makeFakeJwt(u.role, u.sub, u.email, u.bibliotheque_id), 'dev-refresh-token')
     navigate('/dashboard')
   }
 
@@ -54,8 +54,8 @@ export function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      const { data } = await api.post<{ token: string }>('/api/login', { email, password })
-      login(data.token)
+      const { data } = await api.post<{ token: string; refresh_token: string }>('/api/login', { email, password })
+      login(data.token, data.refresh_token)
       navigate('/dashboard')
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } }).response?.status

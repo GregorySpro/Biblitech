@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 interface UseApiCallState<T> {
   data: T | null
@@ -19,10 +19,17 @@ export function useApiCall<T>(
     error: null,
   })
 
+  // Keep fn ref up-to-date without adding it to effect deps (avoids infinite loop
+  // when fn is an inline arrow function that changes reference on every render)
+  const fnRef = useRef(fn)
+  useEffect(() => {
+    fnRef.current = fn
+  })
+
   const refetch = useCallback(async () => {
     setState(s => ({ ...s, loading: true, error: null }))
     try {
-      const data = await fn()
+      const data = await fnRef.current()
       setState({ data, loading: false, error: null })
     } catch (error) {
       const errorObj = error instanceof Error ? error : new Error(String(error))
@@ -33,18 +40,18 @@ export function useApiCall<T>(
       }))
       throw errorObj
     }
-  }, [fn])
+  }, []) // stable reference — always calls the latest fn via fnRef
 
   const setData = useCallback((data: T) => {
     setState(s => ({ ...s, data }))
   }, [])
 
-  // Auto-fetch on mount if immediate is true
+  // Auto-fetch on mount only (immediate flag checked once)
   useEffect(() => {
     if (immediate) {
       void refetch()
     }
-  }, [immediate, refetch])
+  }, [immediate]) // refetch is stable, no risk of infinite loop
 
   return { ...state, refetch, setData }
 }
