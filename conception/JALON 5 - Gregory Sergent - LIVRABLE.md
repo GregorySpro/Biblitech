@@ -12,7 +12,23 @@
 
 ## Sommaire
 
-*(À générer dans Google Docs : **Insertion → Table des matières**)*
+1. Introduction
+2. Ce qui a été développé
+   - 2.1 Vue d'ensemble
+   - 2.2 Entités Doctrine développées
+   - 2.3 Endpoints implémentés
+   - 2.4 Services métier
+   - 2.5 Frontend React
+3. Sécurité
+   - 3.1 Authentification JWT & Refresh Token
+   - 3.2 Contrôle d'accès (RBAC)
+   - 3.3 Protection OWASP Top 10
+   - 3.4 Validation des entrées
+   - 3.5 Conformité RGPD
+4. Tests
+5. Infrastructure & Déploiement
+6. État d'avancement global
+7. Conclusion
 
 ---
 
@@ -32,7 +48,7 @@ Le **Jalon 5** marque la réalisation concrète :
 - Implémentation de l'**API REST Symfony 7** (Controllers, Services, Entities, Repositories)
 - Implémentation des mécanismes de **sécurité** (JWT, RBAC, OWASP)
 - Rédaction et exécution des **tests unitaires et d'intégration**
-- Le **frontend React** (application desktop Tauri) avait été développé en avance ; il est désormais prêt à être connecté au backend
+- Le **frontend React** (application desktop Tauri) avait été développé en avance ; il est désormais **connecté au backend** via axios (appels réels à l'API REST)
 
 ---
 
@@ -60,17 +76,21 @@ backend/
 │   │   ├── Livre.php
 │   │   ├── Exemplaire.php
 │   │   ├── Pret.php
-│   │   └── DemandeMigration.php
+│   │   ├── DemandeMigration.php
+│   │   └── RefreshToken.php
 │   ├── Repository/         # Requêtes Doctrine
 │   │   ├── BibliothequeRepository.php
 │   │   ├── UtilisateurRepository.php
 │   │   ├── LivreRepository.php
 │   │   ├── ExemplaireRepository.php
 │   │   ├── PretRepository.php
-│   │   └── DemandeMigrationRepository.php
+│   │   ├── DemandeMigrationRepository.php
+│   │   └── RefreshTokenRepository.php
 │   ├── Service/            # Logique métier
 │   │   ├── PretService.php
 │   │   └── GoogleBooksService.php
+│   ├── EventSubscriber/    # Écouteurs d'événements Symfony
+│   │   └── JwtCreatedSubscriber.php
 │   └── DTO/                # Data Transfer Objects (validation)
 │       ├── LoginDTO.php
 │       ├── CreatePretDTO.php
@@ -84,7 +104,8 @@ backend/
 │   ├── routes.yaml
 │   └── services.yaml
 ├── migrations/
-│   └── Version20260501000000.php
+│   ├── Version20260501000000.php
+│   └── Version20260526000000.php
 └── tests/
     ├── Unit/
     │   └── Service/
@@ -104,19 +125,21 @@ Les 6 entités correspondent exactement au MPD défini au Jalon 3 :
 | Entité | Table | Relations principales |
 |---|---|---|
 | `Bibliotheque` | `bibliotheques` | OneToMany → Utilisateur, Livre |
-| `Utilisateur` | `utilisateurs` | ManyToOne → Bibliotheque ; OneToMany → Pret, DemandeMigration |
+| `Utilisateur` | `utilisateurs` | ManyToOne → Bibliotheque ; OneToMany → Pret, DemandeMigration, RefreshToken |
 | `Livre` | `livres` | ManyToOne → Bibliotheque ; OneToMany → Exemplaire |
 | `Exemplaire` | `exemplaires` | ManyToOne → Livre ; OneToMany → Pret |
 | `Pret` | `prets` | ManyToOne → Utilisateur, Exemplaire |
 | `DemandeMigration` | `demandes_migration` | ManyToOne → Utilisateur (demandeur + biblio source/cible) |
+| `RefreshToken` | `refresh_tokens` | ManyToOne → Utilisateur (CASCADE DELETE) |
 
 ### 2.3 Endpoints implémentés
 
 L'intégralité des endpoints définis au Jalon 4 a été développée. Résumé par contrôleur :
 
 **`AuthController`**
-- `POST /api/login` — Authentification, retour JWT
-- `POST /api/logout` — Invalidation côté client
+- `POST /api/login` — Authentification, retour JWT + refresh token
+- `POST /api/token/refresh` — Rotation du refresh token, retour nouveau JWT + refresh token
+- `POST /api/logout` — Invalidation du refresh token côté serveur
 
 **`BibliothequeController`** *(super_admin)*
 - `GET /api/bibliotheques` — Liste toutes les bibliothèques
@@ -191,7 +214,7 @@ Le frontend avait été développé en avance de phase. Il est fonctionnel et co
 
 | Fonctionnalité | Statut |
 |---|---|
-| Authentification (login/logout) | ✅ Complet |
+| Authentification (login/logout + refresh token) | ✅ Complet |
 | Tableau de bord (vue staff + adhérent) | ✅ Complet |
 | Catalogue (lecture + CRUD conditionnel par rôle) | ✅ Complet |
 | Prêts/Retours (filtré par rôle) | ✅ Complet |
@@ -199,17 +222,17 @@ Le frontend avait été développé en avance de phase. Il est fonctionnel et co
 | Navigation filtrée par rôle | ✅ Complet |
 | Route guards (ProtectedRoute + rôles) | ✅ Complet |
 | Version mobile (drawer + BottomSheet) | ✅ Complet |
-| Connexion réelle au backend API | 🔄 À brancher (appels axios vers `/api/*`) |
+| Connexion réelle au backend API | ✅ Complet (appels axios vers `/api/*`) |
 
-La connexion au backend sera finalisée dès que le backend sera déployé (Jalon 6).
+Le frontend est **entièrement connecté au backend**. Les données mock ont été remplacées par des appels axios réels. L'intercepteur 401 gère le refresh token silencieux et la rotation automatique des tokens.
 
 ---
 
 ## 3) Sécurité
 
-### 3.1 Authentification JWT
+### 3.1 Authentification JWT & Refresh Token
 
-BiblioTech utilise **LexikJWTAuthenticationBundle** pour l'authentification sans état (stateless).
+BiblioTech utilise **LexikJWTAuthenticationBundle** pour l'authentification sans état (stateless), complété par un système de **refresh token** pour éviter les déconnexions intempestives.
 
 **Flux d'authentification :**
 
@@ -221,7 +244,8 @@ Client                          API Symfony
   │                                  │── Vérifie email en base (UtilisateurRepository)
   │                                  │── Vérifie password (password_hasher Argon2id)
   │                                  │── Génère JWT (RS256, exp: 8h)
-  │<── 200 { token: "eyJ..." } ──────│
+  │                                  │── Génère RefreshToken (hex 64 chars, exp: 30j)
+  │<── 200 { token, refresh_token } ─│
   │                                  │
   │── GET /api/prets ───────────────>│
   │   Authorization: Bearer eyJ...   │
@@ -229,6 +253,13 @@ Client                          API Symfony
   │                                  │── Extrait sub, role, bibliotheque_id
   │                                  │── Vérifie rôle (RBAC)
   │<── 200 [...] ────────────────────│
+  │                                  │
+  │── POST /api/token/refresh ──────>│  (avant expiration, auto. par le frontend)
+  │   { refresh_token: "abc..." }    │
+  │                                  │── Vérifie RT en base (non expiré)
+  │                                  │── Supprime l'ancien RT (rotation)
+  │                                  │── Génère nouveau JWT + nouveau RT
+  │<── 200 { token, refresh_token } ─│
 ```
 
 **Payload JWT :**
@@ -243,11 +274,15 @@ Client                          API Symfony
 }
 ```
 
+Le payload custom (`role`, `bibliotheque_id`) est injecté via un `JwtCreatedSubscriber` qui écoute l'événement `lexik_jwt_authentication.on_jwt_created`.
+
 **Configuration :**
 - Algorithme : **RS256** (clés asymétriques RSA — plus sécurisé que HS256)
-- Durée de validité : **8 heures**
-- Stockage côté client : `localStorage` (frontend React)
+- Durée access token : **8 heures**
+- Durée refresh token : **30 jours** (rotation à chaque utilisation)
+- Stockage côté client : `localStorage` (`biblitech_token` + `biblitech_refresh_token`)
 - Injection : header `Authorization: Bearer <token>` sur toutes les requêtes protégées
+- Refresh silencieux : déclenché automatiquement 5 minutes avant l'expiration du JWT
 
 ### 3.2 Contrôle d'accès (RBAC)
 
@@ -482,13 +517,13 @@ Elle crée les 6 tables, les clés étrangères, les contraintes d'unicité et l
 | Composant | Statut | Détail |
 |---|---|---|
 | **Backend Symfony** | ✅ Développé | Controllers, Services, Entities, Repositories, Config |
-| **Authentification JWT** | ✅ Opérationnel | Login, RBAC, RS256 |
+| **Authentification JWT** | ✅ Opérationnel | Login, refresh token (rotation), logout, RBAC, RS256 |
 | **Sécurité OWASP** | ✅ Implémentée | Rate limiter, validation DTOs, Argon2id |
 | **RGPD** | ✅ Conforme | Droit à l'oubli, minimisation, registre |
 | **Tests** | ✅ 40 tests, 127 assertions | Unitaires + intégration, pipeline CI |
 | **Frontend React** | ✅ Complet | Toutes les pages + gestion des rôles |
-| **Connexion API ↔ Frontend** | 🔄 À finaliser | Remplacement des mock data par appels axios |
-| **Déploiement production** | 🔄 Jalon 6 | Supabase (BDD) + serveur cloud (API) |
+| **Connexion API ↔ Frontend** | ✅ Opérationnel | Appels axios réels, intercepteur 401, auto-refresh |
+| **Déploiement production** | 🕐 Jalon 6 | Supabase (BDD) ✅ configuré ; serveur cloud API à venir |
 
 ---
 
@@ -497,14 +532,13 @@ Elle crée les 6 tables, les clés étrangères, les contraintes d'unicité et l
 Le Jalon 5 concrétise la vision technique posée lors des jalons précédents. Le backend Symfony est opérationnel avec :
 
 - **38 endpoints REST** couvrant l'ensemble des besoins fonctionnels
-- Un système d'**authentification JWT RS256** robuste
+- Un système d'**authentification JWT RS256** robuste avec refresh token (rotation à chaque utilisation)
 - Un **contrôle d'accès RBAC** granulaire (rôle + isolation par bibliothèque)
 - Des **mesures de sécurité** couvrant le Top 10 OWASP
 - **40 tests** automatisés garantissant la non-régression
+- Le **frontend React est entièrement connecté** au backend via des appels axios réels, avec gestion silencieuse du refresh token côté client
 
 La prochaine étape (Jalon 6 — Juin 2026) consistera à :
-1. Connecter le frontend React au backend réel (remplacer les données mock par des appels axios)
-2. Déployer le backend sur un serveur cloud
-3. Configurer la base de données Supabase en production
-4. Réaliser les tests end-to-end Playwright sur l'application complète
-5. Préparer l'installateur Tauri (`.exe` / `.msi`) pour la livraison finale
+1. Déployer le backend sur un serveur cloud
+2. Réaliser les tests end-to-end Playwright sur l'application complète
+3. Préparer l'installateur Tauri (`.exe` / `.msi`) pour la livraison finale
