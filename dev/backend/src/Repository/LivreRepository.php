@@ -13,12 +13,14 @@ class LivreRepository extends ServiceEntityRepository
         parent::__construct($registry, Livre::class);
     }
 
-    public function findByBibliothequeWithFilters(int $bibliothequeId, ?string $titre = null, ?string $auteur = null, ?string $isbn = null): array
+    public function findByBibliothequeWithFilters(?int $bibliothequeId, ?string $titre = null, ?string $auteur = null, ?string $isbn = null): array
     {
         $qb = $this->createQueryBuilder('l')
-            ->where('l.bibliotheque = :bibId')
-            ->setParameter('bibId', $bibliothequeId)
             ->orderBy('l.titre', 'ASC');
+
+        if ($bibliothequeId !== null) {
+            $qb->where('l.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
 
         if ($titre !== null) {
             $qb->andWhere('l.titre LIKE :titre')->setParameter('titre', '%' . $titre . '%');

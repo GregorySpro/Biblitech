@@ -32,20 +32,22 @@ class PretRepository extends ServiceEntityRepository
     /**
      * Récupère tous les prêts en retard d'une bibliothèque.
      */
-    public function findRetardsByBibliotheque(int $bibliothequeId): array
+    public function findRetardsByBibliotheque(?int $bibliothequeId): array
     {
-        return $this->createQueryBuilder('p')
+        $qb = $this->createQueryBuilder('p')
             ->join('p.exemplaire', 'e')
             ->join('e.livre', 'l')
-            ->where('l.bibliotheque = :bibId')
-            ->andWhere('p.dateRetourPrevue < :today')
+            ->where('p.dateRetourPrevue < :today')
             ->andWhere('p.statut != :rendu')
-            ->setParameter('bibId', $bibliothequeId)
             ->setParameter('today', new \DateTimeImmutable('today'))
             ->setParameter('rendu', Pret::STATUT_RENDU)
-            ->orderBy('p.dateRetourPrevue', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->orderBy('p.dateRetourPrevue', 'ASC');
+
+        if ($bibliothequeId !== null) {
+            $qb->andWhere('l.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -64,14 +66,16 @@ class PretRepository extends ServiceEntityRepository
     /**
      * Récupère les prêts d'une bibliothèque avec filtres optionnels.
      */
-    public function findByBibliothequeWithFilters(int $bibliothequeId, ?string $statut = null): array
+    public function findByBibliothequeWithFilters(?int $bibliothequeId, ?string $statut = null): array
     {
         $qb = $this->createQueryBuilder('p')
             ->join('p.exemplaire', 'e')
             ->join('e.livre', 'l')
-            ->where('l.bibliotheque = :bibId')
-            ->setParameter('bibId', $bibliothequeId)
             ->orderBy('p.datePret', 'DESC');
+
+        if ($bibliothequeId !== null) {
+            $qb->where('l.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
 
         if ($statut !== null) {
             $qb->andWhere('p.statut = :statut')->setParameter('statut', $statut);

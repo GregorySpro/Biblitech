@@ -34,12 +34,14 @@ class UtilisateurRepository extends ServiceEntityRepository implements PasswordU
     /**
      * Récupère les utilisateurs d'une bibliothèque donnée, avec filtre optionnel sur le rôle.
      */
-    public function findByBibliotheque(int $bibliothequeId, ?string $role = null): array
+    public function findByBibliotheque(?int $bibliothequeId, ?string $role = null): array
     {
         $qb = $this->createQueryBuilder('u')
-            ->where('u.bibliotheque = :bibId')
-            ->setParameter('bibId', $bibliothequeId)
             ->orderBy('u.nom', 'ASC');
+
+        if ($bibliothequeId !== null) {
+            $qb->where('u.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
 
         if ($role !== null) {
             $qb->andWhere('u.role = :role')->setParameter('role', $role);

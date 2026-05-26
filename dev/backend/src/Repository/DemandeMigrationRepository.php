@@ -13,12 +13,15 @@ class DemandeMigrationRepository extends ServiceEntityRepository
         parent::__construct($registry, DemandeMigration::class);
     }
 
-    public function findByBibliotheque(int $bibliothequeId, ?string $statut = null): array
+    public function findByBibliotheque(?int $bibliothequeId, ?string $statut = null): array
     {
         $qb = $this->createQueryBuilder('d')
-            ->where('d.bibliothequeSource = :bibId OR d.bibliothequeCible = :bibId')
-            ->setParameter('bibId', $bibliothequeId)
             ->orderBy('d.createdAt', 'DESC');
+
+        if ($bibliothequeId !== null) {
+            $qb->where('d.bibliothequeSource = :bibId OR d.bibliothequeCible = :bibId')
+               ->setParameter('bibId', $bibliothequeId);
+        }
 
         if ($statut !== null) {
             $qb->andWhere('d.statut = :statut')->setParameter('statut', $statut);
