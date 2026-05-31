@@ -40,7 +40,28 @@ class AuthController extends AbstractController
 
         $utilisateur = $this->utilisateurRepository->findByEmail($data['email']);
 
+        // Vérification du verrouillage brute-force
+        if ($utilisateur !== null && $utilisateur->isLocked()) {
+            $retryAfter = $utilisateur->getLockedUntil()->getTimestamp() - time();
+            return $this->json([
+                'status'      => 429,
+                'code'        => 'AUTH_ACCOUNT_LOCKED',
+                'message'     => 'Compte temporairement verrouillé suite à trop de tentatives. Réessayez dans ' . ceil($retryAfter / 60) . ' minute(s).',
+                'retry_after' => $retryAfter,
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         if ($utilisateur === null || !$this->passwordHasher->isPasswordValid($utilisateur, $data['password'])) {
+            // Incrémenter le compteur de tentatives si l'utilisateur existe
+            if ($utilisateur !== null) {
+                $attempts = $utilisateur->getLoginAttempts() + 1;
+                $utilisateur->setLoginAttempts($attempts);
+                if ($attempts >= 5) {
+                    $utilisateur->setLockedUntil((new \DateTimeImmutable())->modify('+15 minutes'));
+                    $utilisateur->setLoginAttempts(0);
+                }
+                $this->em->flush();
+            }
             return $this->json([
                 'status'  => 401,
                 'code'    => 'AUTH_INVALID_CREDENTIALS',
@@ -56,11 +77,28 @@ class AuthController extends AbstractController
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Connexion réussie — réinitialiser les tentatives
+        $utilisateur->setLoginAttempts(0);
+        $utilisateur->setLockedUntil(null);
+
+        // Récupérer le nom de la bibliothèque si applicable
+        $biblioNom = null;
+        $bibliothetiqueDuretPret = 21;
+        if ($utilisateur->getBibliotheque() !== null) {
+            $biblioNom = $utilisateur->getBibliotheque()->getNom();
+            $bibliothetiqueDuretPret = $utilisateur->getBibliotheque()->getDuretPretJours();
+        }
+
         $accessToken = $this->jwtManager->createFromPayload($utilisateur, [
-            'sub'             => $utilisateur->getId(),
-            'email'           => $utilisateur->getEmail(),
-            'role'            => $utilisateur->getRole(),
-            'bibliotheque_id' => $utilisateur->getBibliothequeId(),
+            'sub'                   => $utilisateur->getId(),
+            'email'                 => $utilisateur->getEmail(),
+            'role'                  => $utilisateur->getRole(),
+            'bibliotheque_id'       => $utilisateur->getBibliothequeId(),
+            'bibliotheque_nom'      => $biblioNom,
+            'duret_pret_jours'      => $bibliothetiqueDuretPret,
+            'must_change_password'  => $utilisateur->isMustChangePassword(),
+            'cgu_accepted_version'  => $utilisateur->getCguAcceptedVersion(),
+            'prets_suspendus'       => $utilisateur->isPretsSuspendus(),
         ]);
 
         $refreshToken = new RefreshToken($utilisateur);
@@ -110,11 +148,23 @@ class AuthController extends AbstractController
         // Rotation : supprimer l'ancien refresh token, en créer un nouveau
         $this->em->remove($refreshToken);
 
+        $biblioNom = null;
+        $bibliothetiqueDuretPret = 21;
+        if ($utilisateur->getBibliotheque() !== null) {
+            $biblioNom = $utilisateur->getBibliotheque()->getNom();
+            $bibliothetiqueDuretPret = $utilisateur->getBibliotheque()->getDuretPretJours();
+        }
+
         $newAccessToken = $this->jwtManager->createFromPayload($utilisateur, [
-            'sub'             => $utilisateur->getId(),
-            'email'           => $utilisateur->getEmail(),
-            'role'            => $utilisateur->getRole(),
-            'bibliotheque_id' => $utilisateur->getBibliothequeId(),
+            'sub'                   => $utilisateur->getId(),
+            'email'                 => $utilisateur->getEmail(),
+            'role'                  => $utilisateur->getRole(),
+            'bibliotheque_id'       => $utilisateur->getBibliothequeId(),
+            'bibliotheque_nom'      => $biblioNom,
+            'duret_pret_jours'      => $bibliothetiqueDuretPret,
+            'must_change_password'  => $utilisateur->isMustChangePassword(),
+            'cgu_accepted_version'  => $utilisateur->getCguAcceptedVersion(),
+            'prets_suspendus'       => $utilisateur->isPretsSuspendus(),
         ]);
 
         $newRefreshToken = new RefreshToken($utilisateur);
