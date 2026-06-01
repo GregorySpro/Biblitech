@@ -6,6 +6,7 @@ use App\Repository\ExemplaireRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: ExemplaireRepository::class)]
 #[ORM\Table(name: 'exemplaires')]
@@ -14,19 +15,24 @@ class Exemplaire
     public const STATUT_DISPONIBLE  = 'disponible';
     public const STATUT_EMPRUNTE    = 'emprunte';
     public const STATUT_HORS_SERVICE = 'hors_service';
+    public const STATUT_PERDU       = 'perdu';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['pret:read', 'exemplaire:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 50, unique: true)]
+    #[Groups(['pret:read', 'exemplaire:read'])]
     private string $codeExemplaire;
 
     #[ORM\Column(type: 'string', length: 20, options: ['default' => self::STATUT_DISPONIBLE])]
+    #[Groups(['pret:read', 'exemplaire:read'])]
     private string $statut = self::STATUT_DISPONIBLE;
 
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    #[Groups(['pret:read', 'exemplaire:read'])]
     private ?string $etat = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -34,6 +40,7 @@ class Exemplaire
 
     #[ORM\ManyToOne(targetEntity: Livre::class, inversedBy: 'exemplaires')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['pret:read', 'exemplaire:read'])]
     private Livre $livre;
 
     #[ORM\OneToMany(targetEntity: Pret::class, mappedBy: 'exemplaire')]
