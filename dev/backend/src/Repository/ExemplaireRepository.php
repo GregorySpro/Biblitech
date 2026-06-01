@@ -25,4 +25,19 @@ class ExemplaireRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    public function countDisponiblesByBibliotheque(?int $bibliothequeId): int
+    {
+        $qb = $this->createQueryBuilder('e')
+            ->select('COUNT(e.id)')
+            ->join('e.livre', 'l')
+            ->where('e.statut = :statut')
+            ->setParameter('statut', 'disponible');
+
+        if ($bibliothequeId !== null) {
+            $qb->andWhere('l.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
 }

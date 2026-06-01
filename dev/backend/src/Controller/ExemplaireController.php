@@ -4,8 +4,10 @@ namespace App\Controller;
 
 use App\Entity\Exemplaire;
 use App\Entity\Livre;
+use App\Entity\Pret;
 use App\Repository\ExemplaireRepository;
 use App\Repository\LivreRepository;
+use App\Repository\PretRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -22,6 +24,7 @@ class ExemplaireController extends AbstractController
         private readonly LivreRepository $livreRepository,
         private readonly EntityManagerInterface $em,
         private readonly Security $security,
+        private readonly PretRepository $pretRepository,
     ) {}
 
     #[Route('', name: 'api_exemplaires_list', methods: ['GET'])]
@@ -45,7 +48,7 @@ class ExemplaireController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
-        $exemplaires = $this->exemplaireRepository->findBy(['livre' => $livre]);
+        $exemplaires = $this->exemplaireRepository->findByLivre((int)$livreId, $request->query->get('statut') ?: null);
 
         return $this->json($exemplaires, Response::HTTP_OK, [], ['groups' => ['exemplaire:read']]);
     }
@@ -74,6 +77,11 @@ class ExemplaireController extends AbstractController
         $user = $this->security->getUser();
         if (!in_array($user->getRole(), ['bibliothecaire', 'admin', 'super_admin'], true)) {
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Le super_admin gère la plateforme, pas les exemplaires d'une bibliothèque spécifique
+        if ($user->getRole() === 'super_admin') {
+            return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut pas ajouter d\'exemplaires. Cette action appartient aux administrateurs et bibliothécaires de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -144,6 +152,37 @@ class ExemplaireController extends AbstractController
             $exemplaire->setEtat($data['etat']);
         }
 
+        $this->em->flush();
+
+        return $this->json($exemplaire, Response::HTTP_OK, [], ['groups' => ['exemplaire:read']]);
+    }
+
+    #[Route('/{id}/perdu', name: 'api_exemplaires_perdu', methods: ['PATCH'])]
+    public function declarePerdu(int $id): JsonResponse
+    {
+        $user = $this->security->getUser();
+        if (!in_array($user->getRole(), ['bibliothecaire', 'admin', 'super_admin'], true)) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $exemplaire = $this->exemplaireRepository->find($id);
+        if ($exemplaire === null) {
+            return $this->json(['status' => 404, 'code' => 'EXEMPLAIRE_NOT_FOUND', 'message' => 'Exemplaire introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $livre = $exemplaire->getLivre();
+        if ($user->getRole() !== 'super_admin' && $livre->getBibliotheque()->getId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Fermer le prêt actif s'il en existe un
+        $pretActif = $this->pretRepository->findActivePretByExemplaire($id);
+        if ($pretActif !== null) {
+            $pretActif->setStatut(Pret::STATUT_PERDU);
+            $pretActif->setDateRetourEffective(new \DateTimeImmutable());
+        }
+
+        $exemplaire->setStatut(Exemplaire::STATUT_PERDU);
         $this->em->flush();
 
         return $this->json($exemplaire, Response::HTTP_OK, [], ['groups' => ['exemplaire:read']]);

@@ -51,6 +51,20 @@ class PretRepository extends ServiceEntityRepository
     }
 
     /**
+     * Récupère tous les prêts actifs (en_cours ou en_retard) d'un utilisateur.
+     */
+    public function findPretsActifsByUtilisateur(Utilisateur $utilisateur): array
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.utilisateur = :user')
+            ->andWhere('p.statut IN (:statuts)')
+            ->setParameter('user', $utilisateur)
+            ->setParameter('statuts', [Pret::STATUT_EN_COURS, Pret::STATUT_EN_RETARD])
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Récupère les prêts d'un adhérent donné.
      */
     public function findByAdherent(int $utilisateurId): array
@@ -82,5 +96,20 @@ class PretRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Trouve le prêt actif (en_cours ou en_retard) pour un exemplaire donné.
+     */
+    public function findActivePretByExemplaire(int $exemplaireId): ?Pret
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.exemplaire = :exemplaireId')
+            ->andWhere('p.statut IN (:statuts)')
+            ->setParameter('exemplaireId', $exemplaireId)
+            ->setParameter('statuts', [Pret::STATUT_EN_COURS, Pret::STATUT_EN_RETARD])
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 }

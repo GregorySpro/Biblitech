@@ -28,6 +28,7 @@ class PretService
         Utilisateur $utilisateur,
         Exemplaire $exemplaire,
         ?\DateTimeImmutable $dateRetourPrevue = null,
+        ?string $etatDepart = null,
     ): Pret {
         // 1. Vérifier la disponibilité de l'exemplaire
         if (!$exemplaire->isDisponible()) {
@@ -46,6 +47,9 @@ class PretService
             $pret = new Pret();
             $pret->setUtilisateur($utilisateur);
             $pret->setExemplaire($exemplaire);
+            if ($etatDepart !== null) {
+                $pret->setEtatDepart($etatDepart);
+            }
 
             if ($dateRetourPrevue !== null) {
                 $pret->setDateRetourPrevue($dateRetourPrevue);
@@ -70,7 +74,7 @@ class PretService
      *
      * @throws PretAlreadyReturnedException si le prêt est déjà rendu
      */
-    public function enregistrerRetour(Pret $pret): Pret
+    public function enregistrerRetour(Pret $pret, ?string $etatRetour = null): Pret
     {
         if ($pret->getStatut() === Pret::STATUT_RENDU) {
             throw new PretAlreadyReturnedException($pret->getId());
@@ -80,6 +84,9 @@ class PretService
         try {
             $pret->setStatut(Pret::STATUT_RENDU);
             $pret->setDateRetourEffective(new \DateTimeImmutable());
+            if ($etatRetour !== null) {
+                $pret->setEtatRetour($etatRetour);
+            }
 
             // Remettre l'exemplaire disponible
             $pret->getExemplaire()->setStatut(Exemplaire::STATUT_DISPONIBLE);
