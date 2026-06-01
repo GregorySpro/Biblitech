@@ -5,7 +5,6 @@ namespace App\Service;
 use App\Exception\GoogleBooksApiException;
 use App\Exception\IsbnNotFoundException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 class GoogleBooksService
 {
@@ -15,9 +14,6 @@ class GoogleBooksService
         private readonly HttpClientInterface $httpClient,
         private readonly string $apiKey,
     ) {
-        if (empty($this->apiKey)) {
-            throw new \RuntimeException('La variable d\'environnement GOOGLE_BOOKS_API_KEY n\'est pas configurée.');
-        }
     }
 
     /**
@@ -29,11 +25,17 @@ class GoogleBooksService
      */
     public function rechercherParIsbn(string $isbn): array
     {
+        if (empty($this->apiKey) || str_starts_with($this->apiKey, 'your_')) {
+            throw new GoogleBooksApiException('Clé API Google Books non configurée. Veuillez renseigner GOOGLE_BOOKS_API_KEY dans .env.local.', 503);
+        }
+
         try {
             $response = $this->httpClient->request('GET', self::API_URL, [
                 'query' => [
-                    'q'   => 'isbn:' . $isbn,
-                    'key' => $this->apiKey,
+                    'q'            => 'isbn:' . $isbn,
+                    'key'          => $this->apiKey,
+                    'langRestrict' => 'fr',
+                    'country'      => 'FR',
                 ],
                 'timeout' => 5.0,
             ]);
@@ -44,8 +46,12 @@ class GoogleBooksService
                 throw new GoogleBooksApiException('Quota Google Books API dépassé.', 429);
             }
 
+            if ($statusCode === 403) {
+                throw new GoogleBooksApiException('Clé API Google Books non autorisée ou Books API non activée dans Google Cloud Console.', 503);
+            }
+
             if ($statusCode !== 200) {
-                throw new GoogleBooksApiException(sprintf('Réponse inattendue de l\'API : HTTP %d', $statusCode));
+                throw new GoogleBooksApiException(sprintf('Réponse inattendue de l\'API Google Books : HTTP %d', $statusCode), 503);
             }
 
             $data = $response->toArray();
@@ -55,8 +61,12 @@ class GoogleBooksService
             }
 
             return $this->mapMetadonnees($isbn, $data['items'][0]);
-        } catch (TransportExceptionInterface $e) {
-            throw new GoogleBooksApiException('Timeout ou erreur réseau : ' . $e->getMessage());
+        } catch (IsbnNotFoundException $e) {
+            throw $e;
+        } catch (GoogleBooksApiException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new GoogleBooksApiException('Erreur réseau ou timeout : ' . $e->getMessage(), 503);
         }
     }
 

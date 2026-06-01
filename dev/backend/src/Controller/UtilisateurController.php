@@ -23,6 +23,83 @@ class UtilisateurController extends AbstractController
         private readonly Security $security,
     ) {}
 
+    #[Route('/me/accept-cgu', name: 'api_utilisateurs_accept_cgu', methods: ['POST'])]
+    public function acceptCgu(Request $request): JsonResponse
+    {
+        /** @var Utilisateur $user */
+        $user        = $this->security->getUser();
+        $utilisateur = $this->utilisateurRepository->find($user->getId());
+
+        $data    = json_decode($request->getContent(), true) ?? [];
+        $version = $data['version'] ?? '1.0';
+
+        $utilisateur->setCguAcceptedVersion($version);
+        $this->em->flush();
+
+        return $this->json(['message' => 'CGU acceptées.', 'version' => $version], Response::HTTP_OK);
+    }
+
+    #[Route('/me/change-password', name: 'api_utilisateurs_change_password_first', methods: ['POST'])]
+    public function changePasswordFirstLogin(Request $request): JsonResponse
+    {
+        /** @var Utilisateur $user */
+        $user        = $this->security->getUser();
+        $utilisateur = $this->utilisateurRepository->find($user->getId());
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        if (empty($data['password'])) {
+            return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Le nouveau mot de passe est obligatoire.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
+        $utilisateur->setMustChangePassword(false);
+        $this->em->flush();
+
+        return $this->json(['message' => 'Mot de passe changé avec succès.'], Response::HTTP_OK);
+    }
+
+    #[Route('/{id}/suspendre-prets', name: 'api_utilisateurs_suspendre_prets', methods: ['PATCH'])]
+    public function suspendrePrets(int $id, Request $request): JsonResponse
+    {
+        $user = $this->security->getUser();
+        if (!in_array($user->getRole(), ['admin', 'super_admin'], true)) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        $utilisateur = $this->utilisateurRepository->find($id);
+        if ($utilisateur === null) {
+            return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', 'message' => 'Utilisateur introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $data    = json_decode($request->getContent(), true) ?? [];
+        $suspendre = $data['suspendre'] ?? !$utilisateur->isPretsSuspendus();
+
+        $utilisateur->setPretsSuspendus((bool) $suspendre);
+        $this->em->flush();
+
+        return $this->json([
+            'message'         => $suspendre ? 'Prêts suspendus.' : 'Suspension levée.',
+            'prets_suspendus' => $utilisateur->isPretsSuspendus(),
+        ], Response::HTTP_OK);
+    }
+
+    #[Route('/by-email', name: 'api_utilisateurs_by_email', methods: ['GET'])]
+    public function byEmail(Request $request): JsonResponse
+    {
+        $user  = $this->security->getUser();
+        $email = $request->query->get('email', '');
+
+        if (empty($email)) {
+            return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Le paramètre email est obligatoire.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $bibId = $user->getRole() === 'super_admin' ? null : $user->getBibliothequeId();
+        $results = $this->utilisateurRepository->searchByEmailPartial($email, $bibId);
+
+        return $this->json($results, Response::HTTP_OK, [], ['groups' => ['utilisateur:read']]);
+    }
+
     #[Route('/me', name: 'api_utilisateurs_me', methods: ['GET'])]
     public function me(): JsonResponse
     {
@@ -47,6 +124,68 @@ class UtilisateurController extends AbstractController
         }
 
         return $this->json($utilisateurs, Response::HTTP_OK, [], ['groups' => ['utilisateur:read']]);
+    }
+
+    #[Route('/me', name: 'api_utilisateurs_update_me', methods: ['PATCH'])]
+    public function updateMe(Request $request): JsonResponse
+    {
+        /** @var Utilisateur $user */
+        $user        = $this->security->getUser();
+        $utilisateur = $this->utilisateurRepository->find($user->getId());
+
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        if (!empty($data['nom']))    $utilisateur->setNom($data['nom']);
+        if (!empty($data['prenom'])) $utilisateur->setPrenom($data['prenom']);
+
+        if (!empty($data['email']) && $data['email'] !== $utilisateur->getEmail()) {
+            $existing = $this->utilisateurRepository->findByEmail($data['email']);
+            if ($existing !== null && $existing->getId() !== $utilisateur->getId()) {
+                return $this->json(['status' => 409, 'code' => 'USER_EMAIL_DUPLICATE', 'message' => 'Un compte avec cet email existe déjà.'], Response::HTTP_CONFLICT);
+            }
+            $utilisateur->setEmail($data['email']);
+        }
+
+        if (!empty($data['password'])) {
+            // Vérifier le mot de passe actuel avant d'autoriser le changement
+            if (empty($data['current_password'])) {
+                return $this->json(['status' => 400, 'code' => 'CURRENT_PASSWORD_REQUIRED', 'message' => 'Le mot de passe actuel est requis pour en définir un nouveau.'], Response::HTTP_BAD_REQUEST);
+            }
+            if (!$this->passwordHasher->isPasswordValid($utilisateur, $data['current_password'])) {
+                return $this->json(['status' => 403, 'code' => 'INVALID_CURRENT_PASSWORD', 'message' => 'Le mot de passe actuel est incorrect.'], Response::HTTP_FORBIDDEN);
+            }
+            $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
+        }
+
+        $this->em->flush();
+
+        return $this->json($utilisateur, Response::HTTP_OK, [], ['groups' => ['utilisateur:read']]);
+    }
+
+    #[Route('/me', name: 'api_utilisateurs_delete_me', methods: ['DELETE'])]
+    public function deleteMe(): JsonResponse
+    {
+        /** @var Utilisateur $user */
+        $user        = $this->security->getUser();
+        $utilisateur = $this->utilisateurRepository->find($user->getId());
+
+        if ($utilisateur === null) {
+            return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', 'message' => 'Compte introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        // RGPD : anonymisation si l'utilisateur a des prêts historiques
+        if (!$utilisateur->getPrets()->isEmpty()) {
+            $utilisateur->setNom('[SUPPRIMÉ]');
+            $utilisateur->setPrenom('[SUPPRIMÉ]');
+            $utilisateur->setEmail('deleted_' . $utilisateur->getId() . '@anonymous.local');
+            $utilisateur->setActive(false);
+            $this->em->flush();
+        } else {
+            $this->em->remove($utilisateur);
+            $this->em->flush();
+        }
+
+        return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
     #[Route('/{id}', name: 'api_utilisateurs_show', methods: ['GET'])]
@@ -76,6 +215,14 @@ class UtilisateurController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
+
+        // Le super_admin peut créer des admins/super_admins uniquement (pas les adhérents/bibliothécaires)
+        if ($user->getRole() === 'super_admin') {
+            $roleCreation = $data['role'] ?? 'adherent';
+            if (!in_array($roleCreation, ['admin', 'super_admin'], true)) {
+                return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut créer que des comptes admin ou super_admin. Les adhérents sont gérés par l\'admin de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+            }
+        }
 
         foreach (['nom', 'prenom', 'email', 'password'] as $required) {
             if (empty($data[$required])) {
@@ -130,6 +277,38 @@ class UtilisateurController extends AbstractController
         if (!empty($data['prenom'])) $utilisateur->setPrenom($data['prenom']);
         if (!empty($data['password'])) {
             $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
+        }
+
+        // Seul le super_admin peut changer le rôle et la bibliothèque
+        if ($user->getRole() === 'super_admin') {
+            if (!empty($data['role'])) {
+                $allowedRoles = ['adherent', 'bibliothecaire', 'admin', 'super_admin'];
+                if (!in_array($data['role'], $allowedRoles, true)) {
+                    return $this->json(['status' => 400, 'code' => 'INVALID_ROLE', 'message' => 'Rôle invalide.'], Response::HTTP_BAD_REQUEST);
+                }
+                $utilisateur->setRole($data['role']);
+            }
+            if (array_key_exists('bibliotheque_id', $data)) {
+                if ($data['bibliotheque_id'] === null) {
+                    $utilisateur->setBibliotheque(null);
+                } else {
+                    $bibliotheque = $this->em->find(\App\Entity\Bibliotheque::class, (int) $data['bibliotheque_id']);
+                    $utilisateur->setBibliotheque($bibliotheque);
+                }
+            }
+        } elseif ($user->getRole() === 'admin' && !empty($data['role']) && $data['role'] !== $utilisateur->getRole()) {
+            // Un admin peut changer le rôle jusqu'à admin, mais pas super_admin
+            if ($utilisateur->getRole() === 'super_admin') {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Vous ne pouvez pas modifier le rôle d\'un super administrateur.'], Response::HTTP_FORBIDDEN);
+            }
+            $allowedRoles = ['adherent', 'bibliothecaire', 'admin'];
+            if (!in_array($data['role'], $allowedRoles, true)) {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Vous ne pouvez pas attribuer le rôle super_admin.'], Response::HTTP_FORBIDDEN);
+            }
+            $utilisateur->setRole($data['role']);
+        } elseif (!empty($data['role']) && $data['role'] !== $utilisateur->getRole()) {
+            // Tout autre rôle tente de changer le rôle → refus
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Vous ne pouvez pas modifier le rôle d\'un utilisateur.'], Response::HTTP_FORBIDDEN);
         }
 
         $this->em->flush();

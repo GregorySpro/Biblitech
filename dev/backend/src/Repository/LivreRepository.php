@@ -29,20 +29,22 @@ class LivreRepository extends ServiceEntityRepository
             $qb->andWhere('l.auteur LIKE :auteur')->setParameter('auteur', '%' . $auteur . '%');
         }
         if ($isbn !== null) {
-            $qb->andWhere('l.isbn = :isbn')->setParameter('isbn', $isbn);
+            $qb->andWhere('l.isbn LIKE :isbn')->setParameter('isbn', '%' . $isbn . '%');
         }
 
         return $qb->getQuery()->getResult();
     }
 
-    public function findByIsbnAndBibliotheque(string $isbn, int $bibliothequeId): ?Livre
+    public function findByIsbnAndBibliotheque(string $isbn, ?int $bibliothequeId): ?Livre
     {
-        return $this->createQueryBuilder('l')
+        $qb = $this->createQueryBuilder('l')
             ->where('l.isbn = :isbn')
-            ->andWhere('l.bibliotheque = :bibId')
-            ->setParameter('isbn', $isbn)
-            ->setParameter('bibId', $bibliothequeId)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->setParameter('isbn', $isbn);
+
+        if ($bibliothequeId !== null) {
+            $qb->andWhere('l.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
     }
 }

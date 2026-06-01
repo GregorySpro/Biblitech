@@ -4,8 +4,11 @@ namespace App\Controller;
 
 use App\Entity\DemandeMigration;
 use App\Entity\Bibliotheque;
+use App\Entity\Exemplaire;
+use App\Entity\Pret;
 use App\Repository\DemandeMigrationRepository;
 use App\Repository\BibliothequeRepository;
+use App\Repository\PretRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -13,6 +16,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/demandes-migration')]
 class DemandeMigrationController extends AbstractController
@@ -20,8 +24,10 @@ class DemandeMigrationController extends AbstractController
     public function __construct(
         private readonly DemandeMigrationRepository $demandeMigrationRepository,
         private readonly BibliothequeRepository $bibliothequeRepository,
+        private readonly PretRepository $pretRepository,
         private readonly EntityManagerInterface $em,
         private readonly Security $security,
+        private readonly SerializerInterface $serializer,
     ) {}
 
     #[Route('', name: 'api_demandes_migration_list', methods: ['GET'])]
@@ -126,11 +132,32 @@ class DemandeMigrationController extends AbstractController
 
         $demande->setStatut(DemandeMigration::STATUT_VALIDEE);
         $demande->setTraiteeAt(new \DateTimeImmutable());
-        $demande->getUtilisateur()->setBibliotheque($demande->getBibliothequeCible());
+        $utilisateur = $demande->getUtilisateur();
+
+        // Si la bibliothèque source est inactive, on force-ferme tous les prêts actifs
+        // de l'utilisateur pour éviter le deadlock (prêts bloqués, retours impossibles).
+        $pretsForces = 0;
+        $bibliothequeSource = $demande->getBibliothequeSource();
+        if ($bibliothequeSource !== null && !$bibliothequeSource->isActive()) {
+            $pretsActifs = $this->pretRepository->findPretsActifsByUtilisateur($utilisateur);
+            foreach ($pretsActifs as $pret) {
+                $pret->setStatut(Pret::STATUT_RENDU);
+                $pret->setDateRetourEffective(new \DateTimeImmutable());
+                $pret->getExemplaire()->setStatut(Exemplaire::STATUT_DISPONIBLE);
+                $pretsForces++;
+            }
+        }
+
+        $utilisateur->setBibliotheque($demande->getBibliothequeCible());
 
         $this->em->flush();
 
-        return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande_migration:read']]);
+        $demandeNormalized = $this->serializer->normalize($demande, 'json', ['groups' => ['demande_migration:read']]);
+
+        return $this->json(
+            array_merge((array) $demandeNormalized, ['prets_forces' => $pretsForces]),
+            Response::HTTP_OK
+        );
     }
 
     #[Route('/{id}/refuser', name: 'api_demandes_migration_reject', methods: ['PATCH'])]
