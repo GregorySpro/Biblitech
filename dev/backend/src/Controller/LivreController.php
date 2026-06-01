@@ -59,7 +59,8 @@ class LivreController extends AbstractController
         } catch (IsbnNotFoundException $e) {
             return $this->json(['status' => 404, 'code' => 'LIVRE_ISBN_NOT_FOUND_GOOGLE', 'message' => $e->getMessage()], Response::HTTP_NOT_FOUND);
         } catch (GoogleBooksApiException $e) {
-            return $this->json(['status' => 500, 'code' => 'GOOGLE_BOOKS_API_ERROR', 'message' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            $httpCode = in_array($e->getCode(), [429, 503]) ? Response::HTTP_SERVICE_UNAVAILABLE : Response::HTTP_BAD_GATEWAY;
+            return $this->json(['status' => $e->getCode() ?: 502, 'code' => 'GOOGLE_BOOKS_API_ERROR', 'message' => $e->getMessage()], $httpCode);
         }
     }
 
@@ -88,21 +89,28 @@ class LivreController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
+        // Le super_admin gère la plateforme, pas le catalogue d'une bibliothèque spécifique
+        if ($user->getRole() === 'super_admin') {
+            return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut pas ajouter de livres. Cette action appartient aux administrateurs et bibliothécaires de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['titre'])) {
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Le titre est obligatoire.'], Response::HTTP_BAD_REQUEST);
         }
 
+        $bibliothequeId = $user->getBibliothequeId();
+
         // Vérifier la duplication ISBN
         if (!empty($data['isbn'])) {
-            $existing = $this->livreRepository->findByIsbnAndBibliotheque($data['isbn'], $user->getBibliothequeId());
+            $existing = $this->livreRepository->findByIsbnAndBibliotheque($data['isbn'], $bibliothequeId);
             if ($existing !== null) {
                 return $this->json(['status' => 409, 'code' => 'LIVRE_ISBN_DUPLICATE', 'message' => 'Un livre avec cet ISBN existe déjà dans votre catalogue.'], Response::HTTP_CONFLICT);
             }
         }
 
-        $bibliotheque = $this->em->find(\App\Entity\Bibliotheque::class, $user->getBibliothequeId());
+        $bibliotheque = $this->em->find(\App\Entity\Bibliotheque::class, $bibliothequeId);
 
         $livre = new Livre();
         $livre->setTitre($data['titre']);
@@ -110,9 +118,9 @@ class LivreController extends AbstractController
         $livre->setIsbn($data['isbn'] ?? null);
         $livre->setAuteur($data['auteur'] ?? null);
         $livre->setEditeur($data['editeur'] ?? null);
-        $livre->setAnneePublication($data['anneePublication'] ?? null);
+        $livre->setAnneePublication($data['annee_publication'] ?? $data['anneePublication'] ?? null);
         $livre->setDescription($data['description'] ?? null);
-        $livre->setCouvertureUrl($data['couvertureUrl'] ?? null);
+        $livre->setCouvertureUrl($data['couverture_url'] ?? $data['couvertureUrl'] ?? null);
 
         $this->em->persist($livre);
         $this->em->flush();
@@ -142,9 +150,11 @@ class LivreController extends AbstractController
         if (!empty($data['titre'])) $livre->setTitre($data['titre']);
         if (array_key_exists('auteur', $data)) $livre->setAuteur($data['auteur']);
         if (array_key_exists('editeur', $data)) $livre->setEditeur($data['editeur']);
-        if (array_key_exists('anneePublication', $data)) $livre->setAnneePublication($data['anneePublication']);
+        if (array_key_exists('annee_publication', $data)) $livre->setAnneePublication($data['annee_publication']);
+        elseif (array_key_exists('anneePublication', $data)) $livre->setAnneePublication($data['anneePublication']);
         if (array_key_exists('description', $data)) $livre->setDescription($data['description']);
-        if (array_key_exists('couvertureUrl', $data)) $livre->setCouvertureUrl($data['couvertureUrl']);
+        if (array_key_exists('couverture_url', $data)) $livre->setCouvertureUrl($data['couverture_url']);
+        elseif (array_key_exists('couvertureUrl', $data)) $livre->setCouvertureUrl($data['couvertureUrl']);
 
         $this->em->flush();
 

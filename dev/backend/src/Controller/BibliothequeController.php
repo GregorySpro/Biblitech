@@ -32,7 +32,6 @@ class BibliothequeController extends AbstractController
     #[Route('', name: 'api_bibliotheques_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        if ($err = $this->requireSuperAdmin()) return $err;
         return $this->json($this->bibliothequeRepository->findAll(), Response::HTTP_OK, [], ['groups' => ['bibliotheque:read']]);
     }
 
@@ -99,6 +98,9 @@ class BibliothequeController extends AbstractController
         if (array_key_exists('ville', $data))      $bibliotheque->setVille($data['ville']);
         if (array_key_exists('codePostal', $data)) $bibliotheque->setCodePostal($data['codePostal']);
         if (array_key_exists('email', $data))      $bibliotheque->setEmail($data['email']);
+        if (!empty($data['duret_pret_jours']) && is_int($data['duret_pret_jours']) && $data['duret_pret_jours'] > 0) {
+            $bibliotheque->setDuretPretJours((int) $data['duret_pret_jours']);
+        }
 
         $this->em->flush();
 

@@ -31,6 +31,23 @@ class UtilisateurRepository extends ServiceEntityRepository implements PasswordU
         return $this->findOneBy(['email' => $email]);
     }
 
+    public function searchByEmailPartial(string $query, ?int $bibliothequeId): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->where('u.email LIKE :q')
+            ->setParameter('q', '%' . $query . '%')
+            ->andWhere('u.role = :role')
+            ->setParameter('role', 'adherent')
+            ->orderBy('u.email', 'ASC')
+            ->setMaxResults(10);
+
+        if ($bibliothequeId !== null) {
+            $qb->andWhere('u.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
     /**
      * Récupère les utilisateurs d'une bibliothèque donnée, avec filtre optionnel sur le rôle.
      */
@@ -41,6 +58,24 @@ class UtilisateurRepository extends ServiceEntityRepository implements PasswordU
 
         if ($bibliothequeId !== null) {
             $qb->where('u.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
+        }
+
+        if ($role !== null) {
+            $qb->andWhere('u.role = :role')->setParameter('role', $role);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    public function findActiveByBibliotheque(?int $bibliothequeId, ?string $role = null): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->where('u.active = :active')
+            ->setParameter('active', true)
+            ->orderBy('u.nom', 'ASC');
+
+        if ($bibliothequeId !== null) {
+            $qb->andWhere('u.bibliotheque = :bibId')->setParameter('bibId', $bibliothequeId);
         }
 
         if ($role !== null) {

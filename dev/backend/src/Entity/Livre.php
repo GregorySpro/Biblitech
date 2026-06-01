@@ -6,6 +6,7 @@ use App\Repository\LivreRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: LivreRepository::class)]
 #[ORM\Table(name: 'livres')]
@@ -15,27 +16,35 @@ class Livre
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(type: 'integer')]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'string', length: 13, nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?string $isbn = null;
 
     #[ORM\Column(type: 'string', length: 500)]
+    #[Groups(['pret:read', 'livre:read'])]
     private string $titre;
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?string $auteur = null;
 
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?string $editeur = null;
 
     #[ORM\Column(type: 'integer', nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?int $anneePublication = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?string $description = null;
 
     #[ORM\Column(type: 'string', length: 1000, nullable: true)]
+    #[Groups(['pret:read', 'livre:read'])]
     private ?string $couvertureUrl = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -73,4 +82,10 @@ class Livre
     public function getBibliotheque(): Bibliotheque { return $this->bibliotheque; }
     public function setBibliotheque(Bibliotheque $bibliotheque): static { $this->bibliotheque = $bibliotheque; return $this; }
     public function getExemplaires(): Collection { return $this->exemplaires; }
+
+    #[Groups(['livre:read'])]
+    public function getBibliothequeId(): int { return $this->bibliotheque->getId(); }
+
+    #[Groups(['livre:read'])]
+    public function getBibliothequeNom(): string { return $this->bibliotheque->getNom(); }
 }
