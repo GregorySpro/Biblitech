@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   PlusIcon,
@@ -10,6 +10,11 @@ import {
   UserIcon,
   BookOpenIcon,
   FunnelIcon,
+  MagnifyingGlassIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  NoSymbolIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 import { PageLayout } from '../components/PageLayout'
 import { SearchBar } from '../components/SearchBar'
@@ -20,9 +25,14 @@ import { LoadingState } from '../components/LoadingState'
 import { BottomSheet } from '../components/BottomSheet'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { pretService } from '../services/pretService'
+import { livreService } from '../services/livreService'
+import { exemplaireService } from '../services/exemplaireService'
+import { utilisateurService } from '../services/utilisateurService'
+import api from '../services/api'
 import type { Column } from '../components/DataTable'
-import type { Pret } from '../types'
+import type { Pret, Livre, Exemplaire, Utilisateur } from '../types'
 
 // ── Types locaux enrichis ──────────────────────────────────
 interface PretRow extends Omit<Pret, 'exemplaire' | 'utilisateur'> {
@@ -31,11 +41,18 @@ interface PretRow extends Omit<Pret, 'exemplaire' | 'utilisateur'> {
   codeExemplaire: string
 }
 
-const statutConfig: Record<Pret['statut'], { label: string; variant: 'info' | 'success' | 'danger' }> = {
+const statutConfig: Record<string, { label: string; variant: 'info' | 'success' | 'danger' | 'neutral' }> = {
   en_cours:  { label: 'En cours',  variant: 'info'    },
   rendu:     { label: 'Rendu',     variant: 'success' },
   en_retard: { label: 'En retard', variant: 'danger'  },
+  perdu:     { label: 'Perdu',     variant: 'neutral' },
 }
+
+const etatOptions = [
+  { value: 'bon',   label: 'Bon état' },
+  { value: 'usage', label: 'Usagé' },
+  { value: 'abime', label: 'Abîmé' },
+]
 
 type FilterStatut = 'tous' | Pret['statut']
 
@@ -51,7 +68,9 @@ const columnsStaff: Column<PretRow>[] = [
     new Date(r.date_pret).toLocaleDateString('fr-FR')
   )},
   { key: 'date_retour_prevue',   header: 'Retour prévu', width: '110px', sortable: true, render: r => (
-    new Date(r.date_retour_prevue).toLocaleDateString('fr-FR')
+    r.statut === 'perdu'
+      ? <span className="text-gray-400 italic text-xs">Perdu</span>
+      : new Date(r.date_retour_prevue).toLocaleDateString('fr-FR')
   )},
   { key: 'statut', header: 'Statut', width: '110px', render: r => {
     const { label, variant } = statutConfig[r.statut]
@@ -72,13 +91,16 @@ const filterButtons: { key: FilterStatut; label: string }[] = [
 // ── Mapping Pret → PretRow ─────────────────────────────────
 function mapPretToPretRow(p: Pret): PretRow {
   const { exemplaire, utilisateur, ...rest } = p
+  const exemplaireId = p.exemplaire_id ?? exemplaire?.id
   return {
     ...rest,
+    exemplaire_id:  exemplaireId ?? 0,
+    utilisateur_id: p.utilisateur_id ?? utilisateur?.id ?? 0,
     adherentNom:    utilisateur
                       ? `${utilisateur.prenom} ${utilisateur.nom}`
                       : `Adhérent #${p.utilisateur_id}`,
-    livretitre:     exemplaire?.livre?.titre    ?? `Livre #${p.exemplaire_id}`,
-    codeExemplaire: exemplaire?.code_exemplaire ?? `EX-${p.exemplaire_id}`,
+    livretitre:     exemplaire?.livre?.titre    ?? `Livre #${exemplaireId}`,
+    codeExemplaire: exemplaire?.code_exemplaire ?? `EX-${exemplaireId}`,
   }
 }
 
@@ -87,14 +109,148 @@ export function PretsPage() {
   const [filter, setFilter]     = useState<FilterStatut>('tous')
   const [selected, setSelected] = useState<PretRow | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showReturnModal, setShowReturnModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [returning, setReturning] = useState(false)
+  const [declaringPerdu, setDeclaringPerdu] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [exemplaire_id, setExemplaireId] = useState('')
-  const [utilisateur_id, setUtilisateurId] = useState('')
+  const [etatDepart, setEtatDepart] = useState('')
+  const [etatRetour, setEtatRetour] = useState('')
   const { user } = useAuth()
+  const { withLoading } = useGlobalLoading()
   const isAdherent = user?.role === 'adherent'
-  const canManage  = !isAdherent
+  const canManage  = !isAdherent && user?.role !== 'super_admin'
+
+  // ── Nouveau prêt : états du formulaire intelligent ──────
+  const [isbnQuery, setIsbnQuery]         = useState('')
+  const [livresFound, setLivresFound]     = useState<Livre[]>([])
+  const [isbnSearching, setIsbnSearching] = useState(false)
+  const [isbnError, setIsbnError]         = useState<string | null>(null)
+
+  const [selectedLivre, setSelectedLivre]         = useState<Livre | null>(null)
+  const [exemplaires, setExemplaires]             = useState<Exemplaire[]>([])
+  const [exemplairesLoading, setExemplairesLoading] = useState(false)
+  const [selectedExemplaire, setSelectedExemplaire] = useState<Exemplaire | null>(null)
+
+  const [emailQuery, setEmailQuery]         = useState('')
+  const [adherent, setAdherent]             = useState<Utilisateur | null>(null)
+  const [adherentSuggestions, setAdherentSuggestions] = useState<Utilisateur[]>([])
+  const [emailSearching, setEmailSearching] = useState(false)
+  const [emailError, setEmailError]         = useState<string | null>(null)
+
+  const isbnTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Réinitialiser le formulaire ────────────────────────
+  const resetForm = () => {
+    setIsbnQuery('')
+    setLivresFound([])
+    setIsbnError(null)
+    setSelectedLivre(null)
+    setExemplaires([])
+    setSelectedExemplaire(null)
+    setEmailQuery('')
+    setAdherent(null)
+    setAdherentSuggestions([])
+    setEmailError(null)
+    setFormError(null)
+    setEtatDepart('')
+  }
+
+  // ── Recherche ISBN (locale, dans le catalogue) ─────────
+  useEffect(() => {
+    if (isbnTimerRef.current) clearTimeout(isbnTimerRef.current)
+    if (!isbnQuery.trim() || isbnQuery.trim().length < 3) {
+      setLivresFound([])
+      setIsbnError(null)
+      return
+    }
+    isbnTimerRef.current = setTimeout(async () => {
+      setIsbnSearching(true)
+      setIsbnError(null)
+      setSelectedLivre(null)
+      setExemplaires([])
+      setSelectedExemplaire(null)
+      try {
+        const livres = await withLoading(() => livreService.searchInCatalogue(isbnQuery.trim()))
+        if (livres.length === 0) {
+          setIsbnError('Aucun livre trouvé dans votre catalogue pour cet ISBN.')
+          setLivresFound([])
+        } else {
+          setLivresFound(livres)
+        }
+      } catch {
+        setIsbnError('Erreur lors de la recherche.')
+      } finally {
+        setIsbnSearching(false)
+      }
+    }, 400)
+  }, [isbnQuery])
+
+  // ── Sélectionner un livre → charger ses exemplaires disponibles ──
+  const handleSelectLivre = async (livre: Livre) => {
+    setSelectedLivre(livre)
+    setSelectedExemplaire(null)
+    setExemplairesLoading(true)
+    try {
+      const exs = await withLoading(() => exemplaireService.getDisponibles(livre.id))
+      setExemplaires(exs)
+    } catch {
+      setExemplaires([])
+    } finally {
+      setExemplairesLoading(false)
+    }
+  }
+
+  // ── Recherche adhérent par email (partielle) ───────────
+  useEffect(() => {
+    if (emailTimerRef.current) clearTimeout(emailTimerRef.current)
+    if (!emailQuery.trim() || emailQuery.trim().length < 2) {
+      setAdherentSuggestions([])
+      setEmailError(null)
+      return
+    }
+    // Si un adhérent est déjà sélectionné et que sa query correspond, ne pas relancer
+    if (adherent && adherent.email === emailQuery.trim()) {
+      return
+    }
+    emailTimerRef.current = setTimeout(async () => {
+      setEmailSearching(true)
+      setEmailError(null)
+      try {
+        const users = await withLoading(() => utilisateurService.byEmail(emailQuery.trim()))
+        setAdherentSuggestions(users)
+        if (users.length === 0) setEmailError('Aucun adhérent trouvé.')
+      } catch (err) {
+        setEmailError(err instanceof Error ? err.message : 'Erreur lors de la recherche')
+      } finally {
+        setEmailSearching(false)
+      }
+    }, 400)
+  }, [emailQuery, adherent])
+
+  // ── Créer le prêt ──────────────────────────────────────
+  const handleCreateLoan = async () => {
+    if (!selectedExemplaire) { setFormError('Sélectionnez un exemplaire.'); return }
+    if (!adherent) { setFormError('Saisissez un email d\'adhérent valide.'); return }
+    setCreating(true)
+    setFormError(null)
+    try {
+      await withLoading(() => pretService.create({
+        exemplaire_id: selectedExemplaire.id,
+        utilisateur_id: adherent.id,
+        etat_depart: etatDepart || undefined,
+      }))
+      setShowCreateForm(false)
+      resetForm()
+      setSelected(null)
+      await refetch()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erreur lors de la création du prêt')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   // Fetch loans from API
   const { data: allPretsData, loading, error, refetch } = useApiCall(() => pretService.getAll())
@@ -122,42 +278,34 @@ export function PretsPage() {
       })
   }, [search, filter, sourcePrets])
 
-  const handleCreateLoan = async () => {
-    if (!exemplaire_id.trim() || !utilisateur_id.trim()) {
-      setFormError('Exemplaire et adhérent sont obligatoires')
-      return
-    }
-    setCreating(true)
-    try {
-      setFormError(null)
-      await pretService.create({
-        exemplaire_id: parseInt(exemplaire_id),
-        utilisateur_id: parseInt(utilisateur_id),
-      })
-      setShowCreateForm(false)
-      setExemplaireId('')
-      setUtilisateurId('')
-      setSelected(null)
-      await refetch()
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Erreur lors de la création du prêt')
-    } finally {
-      setCreating(false)
-    }
-  }
-
   const handleRegisterReturn = async () => {
     if (!selected) return
     setReturning(true)
     try {
       setFormError(null)
-      await pretService.registerReturn(selected.id)
+      await withLoading(() => pretService.registerReturn(selected.id, etatRetour || undefined))
       setSelected(null)
+      setShowReturnModal(false)
+      setEtatRetour('')
       await refetch()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Erreur lors de l\'enregistrement du retour')
     } finally {
       setReturning(false)
+    }
+  }
+
+  const handleDeclarePerdu = async () => {
+    if (!selected) return
+    setDeclaringPerdu(true)
+    try {
+      await withLoading(() => api.patch(`/api/exemplaires/${selected.exemplaire_id}/perdu`))
+      setSelected(null)
+      await refetch()
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erreur lors de la déclaration de perte')
+    } finally {
+      setDeclaringPerdu(false)
     }
   }
 
@@ -257,11 +405,19 @@ export function PretsPage() {
                   </button>
                   <button
                     disabled={!selected || selected.statut !== 'en_cours' && selected.statut !== 'en_retard'}
-                    onClick={handleRegisterReturn}
+                    onClick={() => { setEtatRetour(''); setShowReturnModal(true) }}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[#16A34A]/30 bg-white text-sm font-medium text-[#16A34A] hover:bg-green-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <ArrowUturnLeftIcon className="w-4 h-4" />
-                    {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
+                    Enregistrer le retour
+                  </button>
+                  <button
+                    disabled={!selected || selected.statut !== 'en_cours' && selected.statut !== 'en_retard'}
+                    onClick={handleDeclarePerdu}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-white text-sm font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <NoSymbolIcon className="w-4 h-4" />
+                    {declaringPerdu ? '…' : 'Déclarer perdu'}
                   </button>
                 </>
               )}
@@ -346,7 +502,7 @@ export function PretsPage() {
                         {new Date(selected.date_retour_prevue).toLocaleDateString('fr-FR')}
                       </span>
                     </div>
-                    {selected.date_retour_effective && (
+                    {selected.date_retour_effective && selected.statut !== 'perdu' && (
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2 text-[#6B7280]">
                           <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
@@ -357,17 +513,53 @@ export function PretsPage() {
                         </span>
                       </div>
                     )}
+                    {selected.statut === 'perdu' && (
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2 text-[#6B7280]">
+                          <NoSymbolIcon className="w-3.5 h-3.5" />
+                          <span>Restitution</span>
+                        </div>
+                        <span className="text-gray-500 font-medium italic">Perdu — non rendu</span>
+                      </div>
+                    )}
                   </div>
+
+                  {/* État départ */}
+                  {selected.etat_depart && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#6B7280]">État au prêt</span>
+                      <span className="text-[#374151] font-medium capitalize">
+                        {etatOptions.find(e => e.value === selected.etat_depart)?.label ?? selected.etat_depart}
+                      </span>
+                    </div>
+                  )}
+                  {/* État retour */}
+                  {selected.etat_retour && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#6B7280]">État au retour</span>
+                      <span className="text-[#374151] font-medium capitalize">
+                        {etatOptions.find(e => e.value === selected.etat_retour)?.label ?? selected.etat_retour}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Action rapide retour */}
                   {canManage && (selected.statut === 'en_cours' || selected.statut === 'en_retard') && (
-                    <button
-                      onClick={handleRegisterReturn}
-                      disabled={returning}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2 disabled:opacity-40">
-                      <ArrowUturnLeftIcon className="w-4 h-4" />
-                      {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
-                    </button>
+                    <>
+                      <button
+                        onClick={() => { setEtatRetour(''); setShowReturnModal(true) }}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2">
+                        <ArrowUturnLeftIcon className="w-4 h-4" />
+                        Enregistrer le retour
+                      </button>
+                      <button
+                        onClick={handleDeclarePerdu}
+                        disabled={declaringPerdu}
+                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors mt-1 disabled:opacity-40">
+                        <NoSymbolIcon className="w-4 h-4" />
+                        {declaringPerdu ? '…' : 'Déclarer perdu'}
+                      </button>
+                    </>
                   )}
                 </div>
               </motion.div>
@@ -447,7 +639,7 @@ export function PretsPage() {
                   {new Date(selected.date_retour_prevue).toLocaleDateString('fr-FR')}
                 </span>
               </div>
-              {selected.date_retour_effective && (
+              {selected.date_retour_effective && selected.statut !== 'perdu' && (
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 text-[#6B7280]">
                     <ArrowUturnLeftIcon className="w-3.5 h-3.5" />
@@ -458,17 +650,34 @@ export function PretsPage() {
                   </span>
                 </div>
               )}
+              {selected.statut === 'perdu' && (
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-[#6B7280]">
+                    <NoSymbolIcon className="w-3.5 h-3.5" />
+                    <span>Restitution</span>
+                  </div>
+                  <span className="text-gray-500 font-medium italic">Perdu — non rendu</span>
+                </div>
+              )}
             </div>
 
             {/* Action rapide retour */}
             {canManage && (selected.statut === 'en_cours' || selected.statut === 'en_retard') && (
-              <button
-                onClick={handleRegisterReturn}
-                disabled={returning}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2 disabled:opacity-40">
-                <ArrowUturnLeftIcon className="w-4 h-4" />
-                {returning ? 'Enregistrement...' : 'Enregistrer le retour'}
-              </button>
+              <>
+                <button
+                  onClick={() => { setEtatRetour(''); setShowReturnModal(true) }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-all duration-200 shadow-sm mt-2">
+                  <ArrowUturnLeftIcon className="w-4 h-4" />
+                  Enregistrer le retour
+                </button>
+                <button
+                  onClick={handleDeclarePerdu}
+                  disabled={declaringPerdu}
+                  className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors mt-1 disabled:opacity-40">
+                  <NoSymbolIcon className="w-4 h-4" />
+                  {declaringPerdu ? '…' : 'Déclarer perdu'}
+                </button>
+              </>
             )}
           </div>
         )}
@@ -482,7 +691,223 @@ export function PretsPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
-            onClick={() => !creating && setShowCreateForm(false)}
+            onClick={() => !creating && (setShowCreateForm(false), resetForm())}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 style={{ fontFamily: 'var(--font-display)' }} className="text-lg font-semibold text-[#111827]">
+                  Nouveau prêt
+                </h3>
+                <button onClick={() => { setShowCreateForm(false); resetForm() }} className="text-[#9CA3AF] hover:text-[#374151]">
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              {formError && (
+                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
+              {/* ── Étape 1 : ISBN ── */}
+              <div className="mb-5">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">
+                  1 — Livre (ISBN)
+                </label>
+                <div className="relative">
+                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+                  <input
+                    type="text"
+                    value={isbnQuery}
+                    onChange={e => setIsbnQuery(e.target.value)}
+                    placeholder="Rechercher par ISBN…"
+                    disabled={creating}
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                  />
+                </div>
+
+                {isbnSearching && (
+                  <p className="text-xs text-[#9CA3AF] mt-2">Recherche en cours…</p>
+                )}
+                {isbnError && (
+                  <p className="text-xs text-red-600 mt-2">{isbnError}</p>
+                )}
+
+                {/* Résultats livres */}
+                {livresFound.length > 0 && !selectedLivre && (
+                  <div className="mt-2 space-y-1.5">
+                    {livresFound.map(livre => (
+                      <button
+                        key={livre.id}
+                        onClick={() => handleSelectLivre(livre)}
+                        className="w-full text-left px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] hover:border-[#1E3A8A]/40 hover:bg-[#EFF6FF] transition-colors"
+                      >
+                        <p className="text-sm font-semibold text-[#111827]">{livre.titre}</p>
+                        <p className="text-xs text-[#6B7280]">
+                          {livre.auteur && <span>{livre.auteur} · </span>}
+                          <span style={{ fontFamily: 'var(--font-mono)' }}>{livre.isbn}</span>
+                          {user?.role === 'super_admin' && livre.bibliotheque_nom && (
+                            <span className="ml-1 text-[#9CA3AF]">({livre.bibliotheque_nom})</span>
+                          )}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Livre sélectionné → exemplaires */}
+                {selectedLivre && (
+                  <div className="mt-2 bg-[#F3F4F6] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="text-sm font-semibold text-[#111827]">{selectedLivre.titre}</p>
+                        {selectedLivre.auteur && <p className="text-xs text-[#6B7280]">{selectedLivre.auteur}</p>}
+                        {user?.role === 'super_admin' && selectedLivre.bibliotheque_nom && (
+                          <p className="text-xs text-[#9CA3AF]">{selectedLivre.bibliotheque_nom}</p>
+                        )}
+                      </div>
+                      <button onClick={() => { setSelectedLivre(null); setExemplaires([]); setSelectedExemplaire(null) }}
+                        className="text-[#9CA3AF] hover:text-[#374151] text-xs underline">
+                        Changer
+                      </button>
+                    </div>
+
+                    <p className="text-xs font-medium text-[#6B7280] mb-1.5">Exemplaires disponibles :</p>
+                    {exemplairesLoading ? (
+                      <p className="text-xs text-[#9CA3AF]">Chargement…</p>
+                    ) : exemplaires.length === 0 ? (
+                      <p className="text-xs text-red-500">Aucun exemplaire disponible pour ce livre.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {exemplaires.map(ex => (
+                          <button
+                            key={ex.id}
+                            onClick={() => setSelectedExemplaire(ex.id === selectedExemplaire?.id ? null : ex)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
+                              selectedExemplaire?.id === ex.id
+                                ? 'bg-[#1E3A8A] text-white'
+                                : 'bg-white border border-[#E5E7EB] text-[#374151] hover:border-[#1E3A8A]/40'
+                            }`}
+                          >
+                            {ex.code_exemplaire}
+                            {selectedExemplaire?.id === ex.id && <CheckCircleIcon className="inline w-3 h-3 ml-1" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Étape 2 : Email adhérent ── */}
+              <div className="mb-6">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">
+                  2 — Adhérent (email)
+                </label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF]" />
+                  <input
+                    type="text"
+                    value={emailQuery}
+                    onChange={e => { setEmailQuery(e.target.value); setAdherent(null) }}
+                    placeholder="Rechercher par email…"
+                    disabled={creating}
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                  />
+                </div>
+                {emailSearching && <p className="text-xs text-[#9CA3AF] mt-1.5">Recherche…</p>}
+                {emailError && <p className="text-xs text-red-600 mt-1.5">{emailError}</p>}
+                {/* Liste de suggestions */}
+                {!adherent && adherentSuggestions.length > 0 && (
+                  <ul className="mt-1.5 border border-[#E5E7EB] rounded-lg overflow-hidden divide-y divide-[#F3F4F6]">
+                    {adherentSuggestions.map(u => (
+                      <li
+                        key={u.id}
+                        onClick={() => { setAdherent(u); setAdherentSuggestions([]); setEmailQuery(u.email) }}
+                        className="flex items-center gap-2.5 px-3 py-2 bg-white hover:bg-[#F9FAFB] cursor-pointer transition-colors"
+                      >
+                        <UserIcon className="w-4 h-4 text-[#9CA3AF] flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-[#111827]">{u.prenom} {u.nom}</p>
+                          <p className="text-xs text-[#6B7280]">{u.email}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* Adhérent sélectionné */}
+                {adherent && (
+                  <div className="mt-2 flex items-center gap-2.5 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                    <CheckCircleIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#111827]">{adherent.prenom} {adherent.nom}</p>
+                      <p className="text-xs text-[#6B7280]">{adherent.email}</p>
+                    </div>
+                    <button onClick={() => { setAdherent(null); setEmailQuery('') }} className="text-[#9CA3AF] hover:text-[#374151]">
+                      <XCircleIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Étape 3 : État du livre ── */}
+              <div className="mb-6">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">
+                  3 — État du livre au départ <span className="font-normal normal-case text-[#9CA3AF]">(optionnel)</span>
+                </label>
+                <div className="flex gap-2">
+                  {etatOptions.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setEtatDepart(etatDepart === opt.value ? '' : opt.value)}
+                      className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        etatDepart === opt.value
+                          ? 'border-[#1E3A8A] bg-[#EFF6FF] text-[#1E3A8A]'
+                          : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#1E3A8A]/40'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  disabled={creating}
+                  onClick={() => { setShowCreateForm(false); resetForm() }}
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
+                >
+                  Annuler
+                </button>
+                <button
+                  disabled={creating || !selectedExemplaire || !adherent}
+                  onClick={handleCreateLoan}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#1E3A8A] text-white text-sm font-medium hover:bg-[#1e40af] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {creating ? 'Création…' : 'Créer le prêt'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ── Return modal with état retour ── */}
+      <AnimatePresence>
+        {showReturnModal && selected && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+            onClick={() => !returning && setShowReturnModal(false)}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -491,7 +916,19 @@ export function PretsPage() {
               className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full"
               onClick={e => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-[#111827] mb-6">Créer un nouveau prêt</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 style={{ fontFamily: 'var(--font-display)' }} className="text-base font-semibold text-[#111827]">
+                  Enregistrer le retour
+                </h3>
+                <button onClick={() => setShowReturnModal(false)} className="text-[#9CA3AF] hover:text-[#374151]">
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#F3F4F6] rounded-lg p-3 mb-4">
+                <p className="text-sm font-semibold text-[#111827]">{selected.livretitre}</p>
+                <p className="text-xs text-[#6B7280] mt-0.5">{selected.adherentNom} · {selected.codeExemplaire}</p>
+              </div>
 
               {formError && (
                 <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
@@ -499,50 +936,48 @@ export function PretsPage() {
                 </div>
               )}
 
-              <div className="space-y-4 mb-6">
-                {/* Exemplaire ID */}
-                <div>
-                  <label className="block text-sm font-medium text-[#374151] mb-1">ID Exemplaire *</label>
-                  <input
-                    type="number"
-                    value={exemplaire_id}
-                    onChange={e => setExemplaireId(e.target.value)}
-                    placeholder="ID de la copie du livre"
-                    disabled={creating}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
-                  />
-                  <p className="text-xs text-[#6B7280] mt-1">Saisissez l'ID de la copie du livre (exemplaire)</p>
-                </div>
-
-                {/* Utilisateur ID */}
-                <div>
-                  <label className="block text-sm font-medium text-[#374151] mb-1">ID Adhérent *</label>
-                  <input
-                    type="number"
-                    value={utilisateur_id}
-                    onChange={e => setUtilisateurId(e.target.value)}
-                    placeholder="ID de l'adhérent"
-                    disabled={creating}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
-                  />
-                  <p className="text-xs text-[#6B7280] mt-1">Saisissez l'ID de l'adhérent qui emprunte</p>
-                </div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-[#6B7280] mb-2">
+                État du livre au retour <span className="font-normal normal-case text-[#9CA3AF]">(optionnel)</span>
+              </label>
+              <div className="flex gap-2 mb-5">
+                {etatOptions.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setEtatRetour(etatRetour === opt.value ? '' : opt.value)}
+                    className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      etatRetour === opt.value
+                        ? 'border-[#16A34A] bg-green-50 text-[#16A34A]'
+                        : 'border-[#E5E7EB] bg-white text-[#6B7280] hover:border-[#16A34A]/40'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
+
+              {selected.etat_depart && (
+                <div className="flex items-center gap-1.5 text-xs text-[#6B7280] mb-4">
+                  <ExclamationTriangleIcon className="w-3.5 h-3.5 text-amber-500" />
+                  État au départ : <span className="font-medium">{etatOptions.find(e => e.value === selected.etat_depart)?.label ?? selected.etat_depart}</span>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button
-                  disabled={creating}
-                  onClick={() => setShowCreateForm(false)}
+                  disabled={returning}
+                  onClick={() => setShowReturnModal(false)}
                   className="flex-1 px-4 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm font-medium text-[#374151] hover:bg-[#F3F4F6] transition-colors disabled:opacity-40"
                 >
                   Annuler
                 </button>
                 <button
-                  disabled={creating}
-                  onClick={handleCreateLoan}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#1E3A8A] text-white text-sm font-medium hover:bg-[#1e40af] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                  disabled={returning}
+                  onClick={handleRegisterReturn}
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-[#16A34A] text-white text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
                 >
-                  {creating ? '...' : 'Créer le prêt'}
+                  <ArrowUturnLeftIcon className="w-4 h-4" />
+                  {returning ? 'Enregistrement…' : 'Confirmer le retour'}
                 </button>
               </div>
             </motion.div>

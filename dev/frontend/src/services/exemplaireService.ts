@@ -23,6 +23,12 @@ export const exemplaireService = {
     return api.get<Exemplaire[]>('/api/exemplaires', { params: { livreId } }).then(r => r.data)
   },
 
+  // List available copies for a specific book (for loan creation)
+  getDisponibles: (livreId: number) => {
+    validateId(livreId)
+    return api.get<Exemplaire[]>('/api/exemplaires', { params: { livreId, statut: 'disponible' } }).then(r => r.data)
+  },
+
   // Get single copy
   getById: (id: number) => {
     validateId(id)

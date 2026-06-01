@@ -7,9 +7,22 @@ export interface CreateUtilisateurDTO {
   email: string
   role: string
   mot_de_passe?: string
+  bibliotheque_id?: number | null
 }
 
-export interface UpdateUtilisateurDTO extends Partial<CreateUtilisateurDTO> {}
+export interface UpdateUtilisateurDTO extends Partial<CreateUtilisateurDTO> {
+  current_password?: string
+}
+
+function toApiPayload(data: CreateUtilisateurDTO | UpdateUtilisateurDTO) {
+  const { mot_de_passe, bibliotheque_id, current_password, ...rest } = data as UpdateUtilisateurDTO & CreateUtilisateurDTO
+  return {
+    ...rest,
+    ...(mot_de_passe ? { password: mot_de_passe } : {}),
+    ...(current_password ? { current_password } : {}),
+    ...(bibliotheque_id !== undefined ? { bibliotheque_id } : {}),
+  }
+}
 
 function validateId(id: number | undefined): void {
   if (id === undefined || id <= 0 || !Number.isInteger(id)) {
@@ -32,14 +45,32 @@ export const utilisateurService = {
     return api.get<Utilisateur>(`/api/utilisateurs/${id}`).then(r => r.data)
   },
 
+  // Search users by partial email (for loan creation)
+  byEmail: async (email: string): Promise<Utilisateur[]> => {
+    try {
+      const r = await api.get<Utilisateur[]>('/api/utilisateurs/by-email', { params: { email } })
+      return r.data
+    } catch (err: any) {
+      throw new Error('Erreur lors de la recherche')
+    }
+  },
+
   // Create user
   create: (data: CreateUtilisateurDTO) =>
-    api.post<Utilisateur>('/api/utilisateurs', data).then(r => r.data),
+    api.post<Utilisateur>('/api/utilisateurs', toApiPayload(data)).then(r => r.data),
+
+  // Update own profile (self)
+  updateMe: (data: UpdateUtilisateurDTO) =>
+    api.patch<Utilisateur>('/api/utilisateurs/me', toApiPayload(data)).then(r => r.data),
+
+  // Delete own account (self, RGPD)
+  deleteMe: () =>
+    api.delete('/api/utilisateurs/me').then(r => r.data),
 
   // Update user
   update: (id: number, data: UpdateUtilisateurDTO) => {
     validateId(id)
-    return api.put<Utilisateur>(`/api/utilisateurs/${id}`, data).then(r => r.data)
+    return api.put<Utilisateur>(`/api/utilisateurs/${id}`, toApiPayload(data)).then(r => r.data)
   },
 
   // Delete user (soft delete / anonymization)

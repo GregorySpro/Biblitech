@@ -1,14 +1,24 @@
 import api from './api'
 import type { Livre } from '../types'
 
+export interface GoogleBooksMetadata {
+  isbn: string
+  titre: string
+  auteur: string | null
+  editeur: string | null
+  anneePublication: number | null
+  description: string | null
+  couvertureUrl: string | null
+}
+
 export interface CreateLivreDTO {
   isbn: string
   titre: string
   auteur: string
   editeur: string
   annee_publication: number
-  genre: string
-  resume: string
+  description?: string
+  bibliotheque_id?: number
 }
 
 export interface UpdateLivreDTO extends Partial<CreateLivreDTO> {}
@@ -37,20 +47,51 @@ export const livreService = {
     return api.get<Livre>(`/api/livres/${id}`).then(r => r.data)
   },
 
-  // Search book by ISBN (Google Books)
-  searchByIsbn: (isbn: string) => {
+  // Search books in local catalogue by ISBN (for loan creation)
+  searchInCatalogue: (isbn: string) =>
+    api.get<Livre[]>('/api/livres', { params: { isbn } }).then(r => r.data),
+
+  // Search book by ISBN (Google Books) — returns metadata to pre-fill the add form
+  searchByIsbn: async (isbn: string) => {
     if (!isbn || isbn.trim().length === 0) {
       throw new Error('ISBN requis')
     }
-    return api.get<Livre>(`/api/livres/isbn/${isbn}`).then(r => r.data)
+    try {
+      return await api.get<GoogleBooksMetadata>(`/api/livres/isbn/${isbn}`).then(r => r.data)
+    } catch (err: any) {
+      const status = err?.response?.status
+      const code   = err?.response?.data?.code
+      if (status === 404 || code === 'LIVRE_ISBN_NOT_FOUND_GOOGLE') {
+        throw new Error('ISBN non reconnu — aucun livre trouvé dans Google Books pour cet identifiant.')
+      }
+      if (status === 503 || status === 502) {
+        throw new Error('Service Google Books indisponible. Remplissez le formulaire manuellement.')
+      }
+      if (status === 409 || code === 'LIVRE_ISBN_DUPLICATE') {
+        throw new Error('Ce livre est déjà dans votre catalogue.')
+      }
+      throw new Error('Erreur lors de la recherche ISBN. Vérifiez votre connexion et réessayez.')
+    }
   },
 
   // Create book
-  create: (data: CreateLivreDTO) => {
+  create: async (data: CreateLivreDTO) => {
     if (!data.isbn?.trim() || !data.titre?.trim()) {
       throw new Error('ISBN et titre requis')
     }
-    return api.post<Livre>('/api/livres', data).then(r => r.data)
+    try {
+      return await api.post<Livre>('/api/livres', data).then(r => r.data)
+    } catch (err: any) {
+      const status = err?.response?.status
+      const code   = err?.response?.data?.code
+      if (status === 409 || code === 'LIVRE_ISBN_DUPLICATE') {
+        throw new Error('Un livre avec cet ISBN existe déjà dans votre catalogue.')
+      }
+      if (status === 400) {
+        throw new Error(err?.response?.data?.message ?? 'Données invalides.')
+      }
+      throw new Error('Erreur lors de l\'ajout du livre. Réessayez.')
+    }
   },
 
   // Update book

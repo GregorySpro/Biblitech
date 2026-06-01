@@ -54,11 +54,12 @@ interface MonPretRow {
   statut: Pret['statut']
 }
 
-const statutLabel: Record<Pret['statut'], { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
+const statutLabel: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }> = {
   en_cours:  { label: 'En cours',  variant: 'info'    },
   rendu:     { label: 'Rendu',     variant: 'success' },
   en_retard: { label: 'En retard', variant: 'danger'  },
 }
+const getStatutLabel = (statut: string) => statutLabel[statut] ?? { label: statut, variant: 'neutral' as const }
 
 // ── Mapping Pret → lignes d'affichage ────────────────────
 function mapPretToMonPretRow(p: Pret): MonPretRow {
@@ -122,7 +123,7 @@ const colsDerniers: Column<PretRow>[] = [
   { key: 'datePret',         header: 'Date prêt',    width: '110px', sortable: true },
   { key: 'dateRetourPrevue', header: 'Retour prévu', width: '110px' },
   { key: 'statut',           header: 'Statut',       width: '100px', render: r => {
-    const { label, variant } = statutLabel[r.statut]
+    const { label, variant } = getStatutLabel(r.statut)
     return <Badge label={label} variant={variant} dot />
   }},
 ]
@@ -140,7 +141,7 @@ const colsMesPrets: Column<MonPretRow>[] = [
     </span>
   )},
   { key: 'statut',           header: 'Statut',       width: '100px', render: r => {
-    const { label, variant } = statutLabel[r.statut]
+    const { label, variant } = getStatutLabel(r.statut)
     return <Badge label={label} variant={variant} dot />
   }},
 ]

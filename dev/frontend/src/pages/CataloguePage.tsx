@@ -17,7 +17,9 @@ import { ErrorAlert } from '../components/ErrorAlert'
 import { LoadingState } from '../components/LoadingState'
 import { useAuth } from '../hooks/useAuth'
 import { useApiCall } from '../hooks/useApiCall'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
 import { livreService } from '../services/livreService'
+import type { GoogleBooksMetadata } from '../services/livreService'
 import { exemplaireService } from '../services/exemplaireService'
 import { validators, errorMessages } from '../utils/validators'
 import type { Column } from '../components/DataTable'
@@ -34,9 +36,6 @@ const columns: Column<Livre>[] = [
   { key: 'auteur', header: 'Auteur',  sortable: true },
   { key: 'editeur',header: 'Éditeur', sortable: true },
   { key: 'annee_publication', header: 'Année', width: '70px', sortable: true },
-  { key: 'genre',  header: 'Genre',   width: '130px', render: r => (
-    <Badge label={r.genre} variant="info" />
-  )},
 ]
 
 // ── Composant principal ────────────────────────────────────
@@ -56,8 +55,7 @@ export function CataloguePage() {
     auteur: '',
     editeur: '',
     annee_publication: new Date().getFullYear(),
-    genre: '',
-    resume: '',
+    description: '',
   })
   const [exemplaires, setExemplaires] = useState<Exemplaire[]>([])
   const [loadingExemplaires, setLoadingExemplaires] = useState(false)
@@ -66,13 +64,14 @@ export function CataloguePage() {
   const [codeExemplaire, setCodeExemplaire] = useState('')
   const [exemplaireStatut, setExemplaireStatut] = useState<'disponible' | 'emprunte' | 'hors_service'>('disponible')
   const { user } = useAuth()
-  const canEdit = user?.role !== 'adherent'
+  const { withLoading } = useGlobalLoading()
+  const canEdit = user?.role !== 'adherent' && user?.role !== 'super_admin'
 
   // Fetch books from API
   const { data: livresData, loading, error, refetch } = useApiCall(() => livreService.getAll())
   const livres = livresData ?? []
 
-  // Handle ISBN search
+  // Handle ISBN search — pre-fills the add-book form with Google Books metadata
   const handleIsbnSearch = async () => {
     if (!isbnSearch.trim()) {
       setIsbnError('Veuillez entrer un ISBN')
@@ -84,8 +83,17 @@ export function CataloguePage() {
     }
     try {
       setIsbnError(null)
-      const livre = await livreService.searchByIsbn(isbnSearch.trim())
-      setSelected(livre)
+      const meta: GoogleBooksMetadata = await livreService.searchByIsbn(isbnSearch.trim())
+      setFormData({
+        isbn: meta.isbn,
+        titre: meta.titre,
+        auteur: meta.auteur ?? '',
+        editeur: meta.editeur ?? '',
+        annee_publication: meta.anneePublication ?? new Date().getFullYear(),
+        description: meta.description ?? '',
+      })
+      setIsEditing(false)
+      setShowFormModal(true)
       setIsbnSearch('')
     } catch (err) {
       setIsbnError(err instanceof Error ? err.message : 'ISBN non trouvé')
@@ -97,7 +105,7 @@ export function CataloguePage() {
     if (!selected) return
     setDeleting(true)
     try {
-      await livreService.delete(selected.id)
+      await withLoading(() => livreService.delete(selected.id))
       setSelected(null)
       setShowDeleteConfirm(false)
       await refetch()
@@ -116,8 +124,7 @@ export function CataloguePage() {
       auteur: '',
       editeur: '',
       annee_publication: new Date().getFullYear(),
-      genre: '',
-      resume: '',
+      description: '',
     })
     setIsEditing(false)
     setShowFormModal(true)
@@ -132,8 +139,7 @@ export function CataloguePage() {
       auteur: selected.auteur,
       editeur: selected.editeur,
       annee_publication: selected.annee_publication,
-      genre: selected.genre,
-      resume: selected.resume,
+      description: selected.description ?? '',
     })
     setIsEditing(true)
     setShowFormModal(true)
@@ -170,11 +176,16 @@ export function CataloguePage() {
     setFormSaving(true)
     try {
       setIsbnError(null)
-      if (isEditing && selected) {
-        await livreService.update(selected.id, formData)
-      } else {
-        await livreService.create(formData)
-      }
+      await withLoading(async () => {
+        if (isEditing && selected) {
+          await livreService.update(selected.id, formData)
+        } else {
+          await livreService.create({
+            ...formData,
+            ...(user?.bibliotheque_id ? { bibliotheque_id: user.bibliotheque_id } : {}),
+          })
+        }
+      })
       setShowFormModal(false)
       setSelected(null)
       await refetch()
@@ -189,7 +200,7 @@ export function CataloguePage() {
   const loadExemplaires = async (livreId: number) => {
     setLoadingExemplaires(true)
     try {
-      const data = await exemplaireService.getByLivre(livreId)
+      const data = await withLoading(() => exemplaireService.getByLivre(livreId))
       setExemplaires(data)
     } catch (err) {
       setIsbnError(err instanceof Error ? err.message : 'Erreur lors du chargement des exemplaires')
@@ -213,10 +224,12 @@ export function CataloguePage() {
     setExemplaireSaving(true)
     try {
       setIsbnError(null)
-      await exemplaireService.create({
-        livreId: selected.id,
-        codeExemplaire: codeExemplaire.trim(),
-        statut: exemplaireStatut,
+      await withLoading(async () => {
+        await exemplaireService.create({
+          livreId: selected.id,
+          codeExemplaire: codeExemplaire.trim(),
+          statut: exemplaireStatut,
+        })
       })
       setCodeExemplaire('')
       setExemplaireStatut('disponible')
@@ -233,7 +246,7 @@ export function CataloguePage() {
   const handleDeleteExemplaire = async (id: number) => {
     if (!window.confirm('Supprimer cet exemplaire ?')) return
     try {
-      await exemplaireService.delete(id)
+      await withLoading(() => exemplaireService.delete(id))
       if (selected) await loadExemplaires(selected.id)
     } catch (err) {
       setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
@@ -247,7 +260,7 @@ export function CataloguePage() {
       l.titre?.toLowerCase().includes(q) ||
       l.auteur?.toLowerCase().includes(q) ||
       l.isbn?.includes(q) ||
-      l.genre?.toLowerCase().includes(q)
+      l.description?.toLowerCase().includes(q)
     )
   }, [search, livres])
 
@@ -426,16 +439,20 @@ export function CataloguePage() {
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF] mb-1">Éditeur</p>
                       <p className="text-[#374151]">{selected.editeur}</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF] mb-1">Genre</p>
-                      <Badge label={selected.genre} variant="info" />
-                    </div>
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF] mb-2">Résumé</p>
-                    <p className="text-sm text-[#6B7280] leading-relaxed">{selected.resume}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF] mb-2">Description</p>
+                    <p className="text-sm text-[#6B7280] leading-relaxed">{selected.description ?? '—'}</p>
                   </div>
+
+                  {/* Durée de prêt */}
+                  {user?.duret_pret_jours && (
+                    <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-sm">
+                      <span className="text-blue-600 font-medium">⏱</span>
+                      <span className="text-blue-700 text-xs">Durée de prêt : <strong>{user.duret_pret_jours} jours</strong></span>
+                    </div>
+                  )}
 
                   {/* Exemplaires section */}
                   <div className="border-t border-[#F3F4F6] pt-4">
@@ -444,7 +461,7 @@ export function CataloguePage() {
                       {canEdit && (
                         <button
                           onClick={() => setShowExemplaireForm(true)}
-                          className="text-[#1E3A8A] hover:text-[#1e40af] transition-colors"
+                          className="text-[#1E3A8A] hover:text-[#1e40af] transition-colors cursor-pointer"
                         >
                           <PlusIcon className="w-4 h-4" />
                         </button>
@@ -464,7 +481,7 @@ export function CataloguePage() {
                             {canEdit && (
                               <button
                                 onClick={() => handleDeleteExemplaire(ex.id)}
-                                className="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                                className="ml-2 text-red-500 hover:text-red-700 transition-colors cursor-pointer"
                               >
                                 <TrashIcon className="w-3 h-3" />
                               </button>
@@ -608,37 +625,24 @@ export function CataloguePage() {
                     </div>
                   </div>
 
-                  {/* Année & Genre */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-[#374151] mb-1">Année de publication</label>
-                      <input
-                        type="number"
-                        value={formData.annee_publication}
-                        onChange={e => setFormData({ ...formData, annee_publication: parseInt(e.target.value) })}
-                        disabled={formSaving}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-[#374151] mb-1">Genre</label>
-                      <input
-                        type="text"
-                        value={formData.genre}
-                        onChange={e => setFormData({ ...formData, genre: e.target.value })}
-                        placeholder="Genre"
-                        disabled={formSaving}
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
-                      />
-                    </div>
+                  {/* Année de publication */}
+                  <div>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Année de publication</label>
+                    <input
+                      type="number"
+                      value={formData.annee_publication}
+                      onChange={e => setFormData({ ...formData, annee_publication: parseInt(e.target.value) })}
+                      disabled={formSaving}
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all disabled:opacity-50"
+                    />
                   </div>
 
-                  {/* Résumé */}
+                  {/* Description */}
                   <div>
-                    <label className="block text-sm font-medium text-[#374151] mb-1">Résumé</label>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Description</label>
                     <textarea
-                      value={formData.resume}
-                      onChange={e => setFormData({ ...formData, resume: e.target.value })}
+                      value={formData.description}
+                      onChange={e => setFormData({ ...formData, description: e.target.value })}
                       placeholder="Description du livre"
                       disabled={formSaving}
                       rows={4}

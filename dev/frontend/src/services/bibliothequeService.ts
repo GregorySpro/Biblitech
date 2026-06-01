@@ -24,7 +24,12 @@ export const bibliothequeService = {
 
   update: (id: number, data: Partial<Bibliotheque>) => {
     validateId(id)
-    return api.patch<Bibliotheque>(`/api/bibliotheques/${id}`, data).then(r => r.data)
+    return api.put<Bibliotheque>(`/api/bibliotheques/${id}`, data).then(r => r.data)
+  },
+
+  setActive: (id: number, active: boolean) => {
+    validateId(id)
+    return api.patch<Bibliotheque>(`/api/bibliotheques/${id}/activer`, { active }).then(r => r.data)
   },
 
   delete: (id: number) => {

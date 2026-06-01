@@ -33,7 +33,7 @@ export const demandesMigrationService = {
 
   approve: (id: number) => {
     validateId(id)
-    return api.patch<DemandeMigration>(`/api/demandes-migration/${id}/approuver`).then(r => r.data)
+    return api.patch<DemandeMigration & { prets_forces: number }>(`/api/demandes-migration/${id}/approuver`).then(r => r.data)
   },
 
   reject: (id: number, data: RejectDemandeMigrationDTO) => {

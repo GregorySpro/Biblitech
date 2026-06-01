@@ -10,6 +10,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   XMarkIcon,
+  Cog6ToothIcon,
+  UserCircleIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline'
 import {
   HomeIcon as HomeSolid,
@@ -17,9 +20,12 @@ import {
   UserGroupIcon as UsersSolid,
   ArrowsRightLeftIcon as ArrowsSolid,
   BuildingLibraryIcon as BuildingSolid,
+  Cog6ToothIcon as CogSolid,
+  UserCircleIcon as UserCircleSolid,
 } from '@heroicons/react/24/solid'
 import clsx from 'clsx'
 import { useAuth } from '../hooks/useAuth'
+import { useCgu } from '../context/CguContext'
 import type { ComponentType } from 'react'
 import type { UserRole } from '../types'
 
@@ -30,13 +36,6 @@ const roleLabelMap: Record<string, string> = {
   adherent:       'Adhérent',
 }
 
-// Mock : en prod, viendra d'un appel GET /api/bibliotheques/{id} ou du contexte global
-const mockBibliotheques: Record<number, string> = {
-  1: 'Médiathèque Centrale',
-  2: 'Bibliothèque du Nord',
-  3: 'Bibliothèque Universitaire',
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const navItems: { to: string; label: string; Icon: ComponentType<any>; IconActive: ComponentType<any>; roles: UserRole[] | null }[] = [
   { to: '/dashboard',  label: 'Tableau de bord', Icon: HomeIcon,               IconActive: HomeSolid,   roles: null },
@@ -44,6 +43,8 @@ const navItems: { to: string; label: string; Icon: ComponentType<any>; IconActiv
   { to: '/adherents',  label: 'Adhérents',        Icon: UserGroupIcon,          IconActive: UsersSolid,  roles: ['super_admin', 'admin'] },
   { to: '/prets',      label: 'Prêts / Retours',  Icon: ArrowsRightLeftIcon,    IconActive: ArrowsSolid, roles: null },
   { to: '/demandes-migration', label: 'Migrations', Icon: BuildingLibraryIcon, IconActive: BuildingSolid, roles: null },
+  { to: '/bibliotheques', label: 'Bibliothèques', Icon: Cog6ToothIcon,          IconActive: CogSolid,    roles: ['super_admin', 'admin'] },
+  { to: '/mon-compte',    label: 'Mon compte',     Icon: UserCircleIcon,         IconActive: UserCircleSolid, roles: null },
 ]
 
 interface SidebarProps {
@@ -55,15 +56,21 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: SidebarProps) {
   const { user, logout } = useAuth()
+  const { currentVersion, pendingCgu } = useCgu()
   const navigate = useNavigate()
 
   const visibleNavItems = navItems.filter(
     item => !item.roles || (user?.role && item.roles.includes(user.role))
   )
 
-  const biblioNom = user?.bibliotheque_id
-    ? (mockBibliotheques[user.bibliotheque_id] ?? `Bibliothèque #${user.bibliotheque_id}`)
+  const biblioNom = user?.bibliotheque_nom ?? null
+
+  // Préavis : jours restants avant entrée en vigueur de la version en attente
+  const pendingDaysLeft = pendingCgu
+    ? Math.ceil((new Date(pendingCgu.effective_at).getTime() - Date.now()) / 86_400_000)
     : null
+
+  const cguMismatch = user && user.cgu_accepted_version !== currentVersion
 
   const handleLogout = () => {
     logout()
@@ -162,6 +169,24 @@ export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: 
 
       {/* ── Navigation ── */}
       <nav className={clsx('flex-1 space-y-0.5', effectiveCollapsed ? 'px-2' : 'px-3')}>
+        {/* Bandeau préavis : nouvelle version CGU à venir (15 jours) */}
+        {!effectiveCollapsed && pendingCgu && pendingDaysLeft !== null && pendingDaysLeft > 0 && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs">
+            <DocumentTextIcon className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">
+              Nouvelles CGU dans {pendingDaysLeft} j
+            </span>
+          </div>
+        )}
+        {/* Bandeau acceptation requise */}
+        {!effectiveCollapsed && cguMismatch && !pendingCgu && (
+          <NavLink to="/premier-login/cgu" onClick={() => onMobileClose?.()}
+            className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs hover:bg-amber-500/30 transition-colors"
+          >
+            <DocumentTextIcon className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Nouvelles CGU à accepter</span>
+          </NavLink>
+        )}
         {visibleNavItems.map(({ to, label, Icon, IconActive }) => (
           <NavLink
             key={to}
@@ -234,6 +259,7 @@ export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: 
         <button
           onClick={() => { onMobileClose?.(); handleLogout() }}
           title={effectiveCollapsed ? 'Déconnexion' : undefined}
+          style={{ cursor: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23f87171' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpolyline points='16 17 21 12 16 7'/%3E%3Cline x1='21' y1='12' x2='9' y2='12'/%3E%3C/svg%3E\") 12 12, pointer" }}
           className={clsx(
             'flex items-center w-full py-2 rounded-xl text-sm font-medium text-red-300/80 hover:bg-red-500/15 hover:text-red-200 transition-all duration-200',
             effectiveCollapsed ? 'justify-center px-0' : 'gap-2.5 px-3'

@@ -4,6 +4,7 @@ import type { Pret } from '../types'
 export interface CreatePretDTO {
   exemplaire_id: number
   utilisateur_id: number
+  etat_depart?: string
 }
 
 export interface PretWithDetails extends Pret {
@@ -54,8 +55,8 @@ export const pretService = {
   },
 
   // Register return
-  registerReturn: (id: number) => {
+  registerReturn: (id: number, etat_retour?: string) => {
     validateId(id)
-    return api.patch<Pret>(`/api/prets/${id}/retour`).then(r => r.data)
+    return api.patch<Pret>(`/api/prets/${id}/retour`, { etat_retour }).then(r => r.data)
   },
 }

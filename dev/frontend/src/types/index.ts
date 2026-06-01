@@ -4,9 +4,9 @@
 
 export type UserRole = 'super_admin' | 'admin' | 'bibliothecaire' | 'adherent'
 
-export type ExemplaireStatut = 'disponible' | 'emprunte' | 'hors_service'
+export type ExemplaireStatut = 'disponible' | 'emprunte' | 'hors_service' | 'perdu'
 export type ExemplaireEtat   = 'bon' | 'usage' | 'abime'
-export type PretStatut       = 'en_cours' | 'rendu' | 'en_retard'
+export type PretStatut       = 'en_cours' | 'rendu' | 'en_retard' | 'perdu'
 export type MigrationStatut  = 'en_attente' | 'validee' | 'refusee'
 
 // ── Payload JWT ───────────────────────────────────────────
@@ -15,6 +15,11 @@ export interface AuthUser {
   email: string
   role: UserRole
   bibliotheque_id: number | null
+  bibliotheque_nom: string | null
+  duret_pret_jours: number
+  must_change_password: boolean
+  cgu_accepted_version: string | null
+  prets_suspendus: boolean
   exp: number
 }
 
@@ -22,8 +27,12 @@ export interface AuthUser {
 export interface Bibliotheque {
   id: number
   nom: string
-  adresse: string
-  actif: boolean
+  adresse: string | null
+  ville: string | null
+  code_postal: string | null
+  email: string | null
+  active: boolean
+  duret_pret_jours: number
   created_at: string
 }
 
@@ -33,9 +42,10 @@ export interface Utilisateur {
   prenom: string
   email: string
   role: UserRole
-  actif: boolean
+  active: boolean
   bibliotheque_id: number | null
-  date_inscription: string
+  prets_suspendus: boolean
+  created_at: string
 }
 
 export interface Livre {
@@ -45,10 +55,10 @@ export interface Livre {
   auteur: string
   editeur: string
   annee_publication: number
-  genre: string
-  resume: string
+  description: string | null
   couverture_url: string | null
   bibliotheque_id: number
+  bibliotheque_nom: string
 }
 
 export interface Exemplaire {
@@ -67,6 +77,8 @@ export interface Pret {
   date_retour_prevue: string
   date_retour_effective: string | null
   statut: PretStatut
+  etat_depart: string | null
+  etat_retour: string | null
   exemplaire_id: number
   utilisateur_id: number
   exemplaire?: Exemplaire & { livre: Livre }
