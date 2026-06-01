@@ -8,31 +8,9 @@ import {
   EyeIcon,
   EyeSlashIcon,
   ExclamationCircleIcon,
-  BeakerIcon,
 } from '@heroicons/react/24/outline'
 import { useAuth } from '../hooks/useAuth'
 import api from '../services/api'
-import type { UserRole } from '../types'
-
-// ── Utilitaire : génère un faux JWT valable 8h (dev only) ──
-function makeFakeJwt(role: UserRole, sub: number, email: string, bibliotheque_id: number | null): string {
-  const header  = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify({
-    sub,
-    email,
-    role,
-    bibliotheque_id,
-    exp: Math.floor(Date.now() / 1000) + 8 * 3600,
-  }))
-  return `${header}.${payload}.dev-signature`
-}
-
-const devUsers: { role: UserRole; label: string; email: string; sub: number; bibliotheque_id: number | null; color: string }[] = [
-  { role: 'super_admin',    label: 'Super Admin',    email: 'superadmin@biblitech.fr',    sub: 1,  bibliotheque_id: null, color: '#7C3AED' },
-  { role: 'admin',          label: 'Admin',           email: 'admin@biblitech.fr',          sub: 2,  bibliotheque_id: 1,    color: '#1E3A8A' },
-  { role: 'bibliothecaire', label: 'Bibliothécaire',  email: 'biblio@biblitech.fr',         sub: 3,  bibliotheque_id: 1,    color: '#0369A1' },
-  { role: 'adherent',       label: 'Adhérent',        email: 'adherent@biblitech.fr',       sub: 4,  bibliotheque_id: 1,    color: '#16A34A' },
-]
 
 export function LoginPage() {
   const [email, setEmail]               = useState('')
@@ -43,11 +21,6 @@ export function LoginPage() {
 
   const { login } = useAuth()
   const navigate  = useNavigate()
-
-  const loginDev = (u: typeof devUsers[number]) => {
-    login(makeFakeJwt(u.role, u.sub, u.email, u.bibliotheque_id), 'dev-refresh-token')
-    navigate('/dashboard')
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -61,6 +34,7 @@ export function LoginPage() {
       const status = (err as { response?: { status?: number } }).response?.status
       if (status === 401) setError('Email ou mot de passe incorrect.')
       else if (status === 403) setError('Votre compte a été désactivé. Contactez votre administrateur.')
+      else if (status === 429) setError('Trop de tentatives infructueuses. Votre compte est temporairement verrouillé. Réessayez dans quelques minutes.')
       else setError('Une erreur est survenue. Veuillez réessayer.')
     } finally {
       setLoading(false)
@@ -198,33 +172,6 @@ export function LoginPage() {
         <p className="text-center text-blue-200/40 text-xs mt-5">
           BiblioTech © 2026 — Grégory Sergent
         </p>
-
-        {/* ── Panel connexion rapide (dev only) ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.3 }}
-          className="mt-4 bg-white/5 border border-white/10 rounded-2xl px-5 py-4"
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <BeakerIcon className="w-4 h-4 text-blue-300/70" />
-            <span className="text-blue-200/60 text-xs font-semibold uppercase tracking-widest">
-              Connexion rapide — Dev
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {devUsers.map(u => (
-              <button
-                key={u.role}
-                onClick={() => loginDev(u)}
-                className="flex flex-col items-start px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all duration-150 text-left"
-              >
-                <span className="text-white text-xs font-semibold">{u.label}</span>
-                <span className="text-blue-200/50 text-[10px] mt-0.5 truncate w-full">{u.email}</span>
-              </button>
-            ))}
-          </div>
-        </motion.div>
       </motion.div>
     </div>
   )

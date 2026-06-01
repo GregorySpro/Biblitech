@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { useGlobalLoading } from '../context/GlobalLoadingContext'
 
 interface UseApiCallState<T> {
   data: T | null
@@ -13,6 +14,8 @@ export function useApiCall<T>(
   refetch: () => Promise<void>
   setData: (data: T) => void
 } {
+  const { increment, decrement } = useGlobalLoading()
+
   const [state, setState] = useState<UseApiCallState<T>>({
     data: null,
     loading: immediate,
@@ -28,6 +31,7 @@ export function useApiCall<T>(
 
   const refetch = useCallback(async () => {
     setState(s => ({ ...s, loading: true, error: null }))
+    increment()
     try {
       const data = await fnRef.current()
       setState({ data, loading: false, error: null })
@@ -39,8 +43,10 @@ export function useApiCall<T>(
         error: errorObj,
       }))
       throw errorObj
+    } finally {
+      decrement()
     }
-  }, []) // stable reference — always calls the latest fn via fnRef
+  }, [increment, decrement]) // stable — always calls the latest fn via fnRef
 
   const setData = useCallback((data: T) => {
     setState(s => ({ ...s, data }))

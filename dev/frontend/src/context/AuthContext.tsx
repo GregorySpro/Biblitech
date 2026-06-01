@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (token: string, refreshToken: string) => void
   logout: () => void
   isAuthenticated: boolean
+  manualRefresh: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextType>({} as AuthContextType)
@@ -16,7 +17,8 @@ export const AuthContext = createContext<AuthContextType>({} as AuthContextType)
 function parseJwt(token: string): AuthUser | null {
   try {
     const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    return JSON.parse(atob(base64)) as AuthUser
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    return JSON.parse(new TextDecoder().decode(bytes)) as AuthUser
   } catch {
     return null
   }
@@ -61,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(newToken)
     setRefreshToken(newRefreshToken)
     setUser(parseJwt(newToken))
+    // Signal au CguContext de (re)charger les CGU depuis l'API
+    window.dispatchEvent(new CustomEvent('biblitech:auth'))
   }, [])
 
   // Schedule the next silent refresh based on token expiry
@@ -113,8 +117,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!token && !!user && user.exp * 1000 > Date.now()
 
+  const manualRefresh = useCallback(async () => {
+    const rt = localStorage.getItem('biblitech_refresh_token')
+    if (!rt) return
+    try {
+      const res = await authService.refresh(rt)
+      login(res.token, res.refresh_token)
+    } catch {
+      logout()
+    }
+  }, [login, logout])
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated, manualRefresh }}>
       {children}
     </AuthContext.Provider>
   )
