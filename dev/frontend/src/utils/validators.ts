@@ -30,7 +30,7 @@ export const validators = {
    * Validate code format (alphanumeric with hyphens/underscores)
    */
   isValidCode: (code: string): boolean => {
-    return /^[A-Za-z0-9\-_]{3,20}$/.test(code)
+    return /^[A-Za-z0-9\-_ .]{3,20}$/.test(code.trim())
   },
 
   /**
@@ -41,10 +41,10 @@ export const validators = {
   },
 
   /**
-   * Validate name (at least 2 characters, no numbers)
+   * Validate name (at least 2 characters, allows letters, spaces, hyphens, apostrophes, dots, digits)
    */
   isValidName: (name: string): boolean => {
-    return /^[a-zA-ZÀ-ÿ\s\-']{2,50}$/.test(name.trim())
+    return /^[a-zA-ZÀ-ÿ0-9\s\-'.,]{2,200}$/.test(name.trim())
   },
 
   /**
@@ -58,9 +58,9 @@ export const validators = {
 export const errorMessages = {
   isbn: 'ISBN invalide. Format attendu: ISBN-10 ou ISBN-13',
   email: 'Format email invalide',
-  code: 'Code invalide (3-20 caractères alphanumériques)',
+  code: 'Code invalide (3-20 caractères : lettres, chiffres, tiret, espace)',
   year: 'Année invalide (1900-2100)',
-  name: 'Nom invalide (2-50 caractères, lettres et espaces)',
+  name: 'Nom invalide (2-200 caractères)',
   password: 'Mot de passe faible (min. 8 caractères, 1 majuscule, 1 chiffre)',
   required: 'Champ obligatoire',
   duplicate: 'Cette valeur existe déjà',
