@@ -21,7 +21,7 @@ WORKDIR /var/www/html
 
 # Copier les dépendances et installer
 COPY composer.json composer.lock* ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
 # Copier l'application
 COPY . .
