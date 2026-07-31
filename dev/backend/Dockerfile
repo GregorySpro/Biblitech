@@ -26,16 +26,22 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-di
 # Copier l'application
 COPY . .
 
-# Générer les clés JWT (si non existantes)
+# Générer les clés JWT sans passphrase (protégées par l'accès conteneur)
+# JWT_PASSPHRASE doit être "" (vide) dans les variables d'environnement de production
 RUN mkdir -p config/jwt && \
-    if [ ! -f config/jwt/private.pem ]; then \
-        openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:${JWT_PASSPHRASE:-secret} && \
-        openssl rsa -pubout -in config/jwt/private.pem -out config/jwt/public.pem -passin pass:${JWT_PASSPHRASE:-secret}; \
-    fi
+    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 \
+        -out config/jwt/private.pem && \
+    openssl pkey -in config/jwt/private.pem -pubout \
+        -out config/jwt/public.pem
+
+# Créer les répertoires Symfony nécessaires
+RUN mkdir -p var/cache var/log
 
 # Permissions
-RUN chown -R www-data:www-data var/ && \
-    chmod -R 775 var/
+RUN chown -R www-data:www-data var/ config/jwt/ && \
+    chmod -R 775 var/ && \
+    chmod 600 config/jwt/private.pem && \
+    chmod 644 config/jwt/public.pem
 
 # Config nginx
 COPY docker/nginx.conf /etc/nginx/nginx.conf
