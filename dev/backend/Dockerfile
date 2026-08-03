@@ -46,6 +46,10 @@ RUN chown -R www-data:www-data var/ config/jwt/ && \
 # Config nginx
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
+# Entrypoint (migrations + server)
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 8080
 
-CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
+CMD ["/entrypoint.sh"]
