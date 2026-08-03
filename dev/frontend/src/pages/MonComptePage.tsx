@@ -55,7 +55,7 @@ export function MonComptePage() {
     setPwdError(null)
     setPwdSuccess(false)
     try {
-      await utilisateurService.updateMe({ current_password: currentPwd, password: newPwd })
+      await utilisateurService.updateMe({ current_password: currentPwd, mot_de_passe: newPwd })
       setCurrentPwd('')
       setNewPwd('')
       setConfirmPwd('')

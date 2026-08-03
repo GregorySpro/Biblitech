@@ -56,7 +56,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: SidebarProps) {
   const { user, logout } = useAuth()
-  const { currentVersion, pendingCgu } = useCgu()
+  const { currentVersion } = useCgu()
   const navigate = useNavigate()
 
   const visibleNavItems = navItems.filter(
@@ -64,11 +64,6 @@ export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: 
   )
 
   const biblioNom = user?.bibliotheque_nom ?? null
-
-  // Préavis : jours restants avant entrée en vigueur de la version en attente
-  const pendingDaysLeft = pendingCgu
-    ? Math.ceil((new Date(pendingCgu.effective_at).getTime() - Date.now()) / 86_400_000)
-    : null
 
   const cguMismatch = user && user.cgu_accepted_version !== currentVersion
 
@@ -169,17 +164,8 @@ export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: 
 
       {/* ── Navigation ── */}
       <nav className={clsx('flex-1 space-y-0.5', effectiveCollapsed ? 'px-2' : 'px-3')}>
-        {/* Bandeau préavis : nouvelle version CGU à venir (15 jours) */}
-        {!effectiveCollapsed && pendingCgu && pendingDaysLeft !== null && pendingDaysLeft > 0 && (
-          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs">
-            <DocumentTextIcon className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">
-              Nouvelles CGU dans {pendingDaysLeft} j
-            </span>
-          </div>
-        )}
         {/* Bandeau acceptation requise */}
-        {!effectiveCollapsed && cguMismatch && !pendingCgu && (
+        {!effectiveCollapsed && cguMismatch && (
           <NavLink to="/premier-login/cgu" onClick={() => onMobileClose?.()}
             className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-200 text-xs hover:bg-amber-500/30 transition-colors"
           >
