@@ -21,7 +21,7 @@ export function GlobalLoadingProvider({ children }: { children: ReactNode }) {
   const increment = useCallback(() => setCounter(c => c + 1), [])
   const decrement = useCallback(() => setCounter(c => Math.max(0, c - 1)), [])
 
-  const withLoading = useCallback(async <T>(fn: () => Promise<T>): Promise<T> => {
+  const withLoading = useCallback(async <T,>(fn: () => Promise<T>): Promise<T> => {
     increment()
     try {
       return await fn()
