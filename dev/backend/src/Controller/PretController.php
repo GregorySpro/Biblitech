@@ -87,6 +87,14 @@ class PretController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
+        // Isolation multi-tenant : le staff ne peut consulter que les adhérents de sa bibliothèque
+        if ($user->getRole() !== 'super_admin' && $user->getRole() !== 'adherent') {
+            $adherent = $this->utilisateurRepository->find($id);
+            if ($adherent !== null && $adherent->getBibliothequeId() !== $user->getBibliothequeId()) {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         $prets = $this->pretRepository->findByAdherent($id);
         return $this->json($prets, Response::HTTP_OK, [], ['groups' => ['pret:read']]);
     }
@@ -104,6 +112,14 @@ class PretController extends AbstractController
         // Un adhérent ne peut voir que ses propres prêts
         if ($user->getRole() === 'adherent' && $pret->getUtilisateur()->getId() !== $user->getId()) {
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Isolation multi-tenant : staff limité à sa propre bibliothèque
+        if ($user->getBibliothequeId() !== null) {
+            $pretBibId = $pret->getExemplaire()->getLivre()->getBibliotheque()->getId();
+            if ($pretBibId !== $user->getBibliothequeId()) {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+            }
         }
 
         return $this->json($pret, Response::HTTP_OK, [], ['groups' => ['pret:read']]);
@@ -160,6 +176,19 @@ class PretController extends AbstractController
             return $this->json(['status' => 404, 'code' => 'EXEMPLAIRE_NOT_FOUND', 'message' => 'Exemplaire introuvable.'], Response::HTTP_NOT_FOUND);
         }
 
+        // Isolation multi-tenant : l'exemplaire doit appartenir à la bibliothèque du bibliothécaire
+        if ($user->getBibliothequeId() !== null) {
+            $exempiaireBibId = $exemplaire->getLivre()->getBibliotheque()->getId();
+            if ($exempiaireBibId !== $user->getBibliothequeId()) {
+                return $this->json(['status' => 403, 'code' => 'EXEMPLAIRE_WRONG_LIBRARY', 'message' => 'Cet exemplaire n\'appartient pas à votre bibliothèque.'], Response::HTTP_FORBIDDEN);
+            }
+        }
+
+        // Isolation multi-tenant : l'adhérent doit appartenir à la même bibliothèque
+        if ($user->getBibliothequeId() !== null && $utilisateur->getBibliothequeId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ADHERENT_WRONG_LIBRARY', 'message' => 'Cet adhérent n\'appartient pas à votre bibliothèque.'], Response::HTTP_FORBIDDEN);
+        }
+
         $dateRetour = null;
         if (!empty($data['date_retour_prevue'])) {
             $dateRetour = new \DateTimeImmutable($data['date_retour_prevue']);
@@ -184,7 +213,7 @@ class PretController extends AbstractController
     }
 
     #[Route('/{id}/retour', name: 'api_prets_retour', methods: ['PATCH'])]
-    public function retour(int $id): JsonResponse
+    public function retour(int $id, Request $request): JsonResponse
     {
         $user = $this->security->getUser();
         if (!in_array($user->getRole(), ['bibliothecaire', 'admin', 'super_admin'], true)) {
@@ -196,6 +225,14 @@ class PretController extends AbstractController
         $pret = $this->pretRepository->find($id);
         if ($pret === null) {
             return $this->json(['status' => 404, 'code' => 'PRET_NOT_FOUND', 'message' => 'Prêt introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Isolation multi-tenant : vérifier que le prêt appartient à la bibliothèque du bibliothécaire
+        if ($user->getBibliothequeId() !== null) {
+            $pretBibId = $pret->getExemplaire()->getLivre()->getBibliotheque()->getId();
+            if ($pretBibId !== $user->getBibliothequeId()) {
+                return $this->json(['status' => 403, 'code' => 'PRET_WRONG_LIBRARY', 'message' => 'Ce prêt n\'appartient pas à votre bibliothèque.'], Response::HTTP_FORBIDDEN);
+            }
         }
 
         try {

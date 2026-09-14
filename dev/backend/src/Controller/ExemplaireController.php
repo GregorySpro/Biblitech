@@ -110,10 +110,16 @@ class ExemplaireController extends AbstractController
             return $this->json(['status' => 409, 'code' => 'CODE_DUPLICATE', 'message' => 'Un exemplaire avec ce code existe déjà.'], Response::HTTP_CONFLICT);
         }
 
+        $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE];
+        $statut = $data['statut'] ?? Exemplaire::STATUT_DISPONIBLE;
+        if (!in_array($statut, $allowedStatuts, true)) {
+            return $this->json(['status' => 400, 'code' => 'INVALID_STATUT', 'message' => 'Statut invalide.'], Response::HTTP_BAD_REQUEST);
+        }
+
         $exemplaire = new Exemplaire();
         $exemplaire->setCodeExemplaire($data['codeExemplaire']);
         $exemplaire->setLivre($livre);
-        $exemplaire->setStatut($data['statut'] ?? Exemplaire::STATUT_DISPONIBLE);
+        $exemplaire->setStatut($statut);
         if (array_key_exists('etat', $data)) {
             $exemplaire->setEtat($data['etat']);
         }
@@ -146,6 +152,10 @@ class ExemplaireController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         if (array_key_exists('statut', $data)) {
+            $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE];
+            if (!in_array($data['statut'], $allowedStatuts, true)) {
+                return $this->json(['status' => 400, 'code' => 'INVALID_STATUT', 'message' => 'Statut invalide.'], Response::HTTP_BAD_REQUEST);
+            }
             $exemplaire->setStatut($data['statut']);
         }
         if (array_key_exists('etat', $data)) {

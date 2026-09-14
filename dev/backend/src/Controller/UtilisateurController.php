@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Utilisateur;
+use App\Repository\CguVersionRepository;
 use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,10 +19,28 @@ class UtilisateurController extends AbstractController
 {
     public function __construct(
         private readonly UtilisateurRepository $utilisateurRepository,
+        private readonly CguVersionRepository $cguVersionRepository,
         private readonly EntityManagerInterface $em,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly Security $security,
     ) {}
+
+    private function validatePasswordStrength(string $password): ?string
+    {
+        if (strlen($password) < 8) {
+            return 'Le mot de passe doit contenir au moins 8 caractères.';
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            return 'Le mot de passe doit contenir au moins une lettre majuscule.';
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            return 'Le mot de passe doit contenir au moins un chiffre.';
+        }
+        if (!preg_match('/[^a-zA-Z0-9]/', $password)) {
+            return 'Le mot de passe doit contenir au moins un caractère spécial.';
+        }
+        return null;
+    }
 
     #[Route('/me/accept-cgu', name: 'api_utilisateurs_accept_cgu', methods: ['POST'])]
     public function acceptCgu(Request $request): JsonResponse
@@ -31,7 +50,17 @@ class UtilisateurController extends AbstractController
         $utilisateur = $this->utilisateurRepository->find($user->getId());
 
         $data    = json_decode($request->getContent(), true) ?? [];
-        $version = $data['version'] ?? '1.0';
+        $version = $data['version'] ?? null;
+
+        if (empty($version)) {
+            return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'La version des CGU est obligatoire.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Valider que la version fournie correspond à la version active en base
+        $currentCgu = $this->cguVersionRepository->findCurrentVersion();
+        if ($currentCgu === null || $version !== $currentCgu->getVersion()) {
+            return $this->json(['status' => 400, 'code' => 'INVALID_CGU_VERSION', 'message' => 'Version de CGU invalide ou non en vigueur.'], Response::HTTP_BAD_REQUEST);
+        }
 
         $utilisateur->setCguAcceptedVersion($version);
         $this->em->flush();
@@ -50,6 +79,11 @@ class UtilisateurController extends AbstractController
 
         if (empty($data['password'])) {
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Le nouveau mot de passe est obligatoire.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $passwordError = $this->validatePasswordStrength($data['password']);
+        if ($passwordError !== null) {
+            return $this->json(['status' => 400, 'code' => 'WEAK_PASSWORD', 'message' => $passwordError], Response::HTTP_BAD_REQUEST);
         }
 
         $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
@@ -72,6 +106,11 @@ class UtilisateurController extends AbstractController
             return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', 'message' => 'Utilisateur introuvable.'], Response::HTTP_NOT_FOUND);
         }
 
+        // Isolation multi-tenant : un admin ne peut agir que sur sa propre bibliothèque
+        if ($user->getRole() !== 'super_admin' && $utilisateur->getBibliothequeId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
         $data    = json_decode($request->getContent(), true) ?? [];
         $suspendre = $data['suspendre'] ?? !$utilisateur->isPretsSuspendus();
 
@@ -87,7 +126,13 @@ class UtilisateurController extends AbstractController
     #[Route('/by-email', name: 'api_utilisateurs_by_email', methods: ['GET'])]
     public function byEmail(Request $request): JsonResponse
     {
-        $user  = $this->security->getUser();
+        $user = $this->security->getUser();
+
+        // Réservé au staff (bibliothécaire minimum) — un adhérent ne peut pas énumérer les autres membres
+        if (!in_array($user->getRole(), ['bibliothecaire', 'admin', 'super_admin'], true)) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
         $email = $request->query->get('email', '');
 
         if (empty($email)) {
@@ -154,6 +199,10 @@ class UtilisateurController extends AbstractController
             if (!$this->passwordHasher->isPasswordValid($utilisateur, $data['current_password'])) {
                 return $this->json(['status' => 403, 'code' => 'INVALID_CURRENT_PASSWORD', 'message' => 'Le mot de passe actuel est incorrect.'], Response::HTTP_FORBIDDEN);
             }
+            $passwordError = $this->validatePasswordStrength($data['password']);
+            if ($passwordError !== null) {
+                return $this->json(['status' => 400, 'code' => 'WEAK_PASSWORD', 'message' => $passwordError], Response::HTTP_BAD_REQUEST);
+            }
             $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
         }
 
@@ -203,6 +252,11 @@ class UtilisateurController extends AbstractController
             return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', 'message' => 'Utilisateur introuvable.'], Response::HTTP_NOT_FOUND);
         }
 
+        // Isolation multi-tenant : admin et bibliothécaire limités à leur propre bibliothèque
+        if ($user->getRole() !== 'super_admin' && $user->getId() !== $id && $utilisateur->getBibliothequeId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
         return $this->json($utilisateur, Response::HTTP_OK, [], ['groups' => ['utilisateur:read']]);
     }
 
@@ -216,11 +270,22 @@ class UtilisateurController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
 
+        $roleCreation = $data['role'] ?? Utilisateur::ROLE_ADHERENT;
+
         // Le super_admin peut créer des admins/super_admins uniquement (pas les adhérents/bibliothécaires)
         if ($user->getRole() === 'super_admin') {
-            $roleCreation = $data['role'] ?? 'adherent';
             if (!in_array($roleCreation, ['admin', 'super_admin'], true)) {
                 return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut créer que des comptes admin ou super_admin. Les adhérents sont gérés par l\'admin de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+            }
+        }
+
+        // L'admin ne peut pas créer de super_admin, et ne peut créer des utilisateurs que dans sa propre bibliothèque
+        if ($user->getRole() === 'admin') {
+            if (!in_array($roleCreation, ['adherent', 'bibliothecaire', 'admin'], true)) {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Vous ne pouvez pas créer de compte avec ce rôle.'], Response::HTTP_FORBIDDEN);
+            }
+            if (!empty($data['bibliotheque_id']) && (int) $data['bibliotheque_id'] !== $user->getBibliothequeId()) {
+                return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Vous ne pouvez créer des utilisateurs que dans votre propre bibliothèque.'], Response::HTTP_FORBIDDEN);
             }
         }
 
@@ -228,6 +293,11 @@ class UtilisateurController extends AbstractController
             if (empty($data[$required])) {
                 return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => "Le champ $required est obligatoire."], Response::HTTP_BAD_REQUEST);
             }
+        }
+
+        $passwordError = $this->validatePasswordStrength($data['password']);
+        if ($passwordError !== null) {
+            return $this->json(['status' => 400, 'code' => 'WEAK_PASSWORD', 'message' => $passwordError], Response::HTTP_BAD_REQUEST);
         }
 
         if ($this->utilisateurRepository->findByEmail($data['email']) !== null) {
@@ -271,12 +341,34 @@ class UtilisateurController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
+        // Isolation multi-tenant : un admin ne peut modifier que les utilisateurs de sa bibliothèque
+        if ($user->getRole() === 'admin' && $user->getId() !== $id && $utilisateur->getBibliothequeId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (!empty($data['nom']))    $utilisateur->setNom($data['nom']);
         if (!empty($data['prenom'])) $utilisateur->setPrenom($data['prenom']);
         if (!empty($data['password'])) {
+            // Quand l'utilisateur modifie son propre mot de passe via cette route, exiger le mot de passe actuel
+            if ($user->getId() === $id) {
+                if (empty($data['current_password'])) {
+                    return $this->json(['status' => 400, 'code' => 'CURRENT_PASSWORD_REQUIRED', 'message' => 'Le mot de passe actuel est requis pour modifier votre mot de passe.'], Response::HTTP_BAD_REQUEST);
+                }
+                if (!$this->passwordHasher->isPasswordValid($utilisateur, $data['current_password'])) {
+                    return $this->json(['status' => 403, 'code' => 'INVALID_CURRENT_PASSWORD', 'message' => 'Le mot de passe actuel est incorrect.'], Response::HTTP_FORBIDDEN);
+                }
+            }
+            $passwordError = $this->validatePasswordStrength($data['password']);
+            if ($passwordError !== null) {
+                return $this->json(['status' => 400, 'code' => 'WEAK_PASSWORD', 'message' => $passwordError], Response::HTTP_BAD_REQUEST);
+            }
             $utilisateur->setPassword($this->passwordHasher->hashPassword($utilisateur, $data['password']));
+            // Forcer le changement de mot de passe seulement lors d'une réinitialisation par un admin
+            if ($user->getId() !== $id) {
+                $utilisateur->setMustChangePassword(true);
+            }
         }
 
         // Seul le super_admin peut changer le rôle et la bibliothèque
@@ -327,6 +419,11 @@ class UtilisateurController extends AbstractController
         $utilisateur = $this->utilisateurRepository->find($id);
         if ($utilisateur === null) {
             return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', 'message' => 'Utilisateur introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Isolation multi-tenant : un admin ne peut supprimer que les utilisateurs de sa bibliothèque
+        if ($user->getRole() === 'admin' && $utilisateur->getBibliothequeId() !== $user->getBibliothequeId()) {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
         // RGPD : anonymisation plutôt que suppression physique si l'utilisateur a des prêts

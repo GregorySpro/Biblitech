@@ -32,7 +32,16 @@ class BibliothequeController extends AbstractController
     #[Route('', name: 'api_bibliotheques_list', methods: ['GET'])]
     public function list(): JsonResponse
     {
-        return $this->json($this->bibliothequeRepository->findAll(), Response::HTTP_OK, [], ['groups' => ['bibliotheque:read']]);
+        $user = $this->security->getUser();
+
+        if ($user->getRole() === 'super_admin') {
+            $bibliotheques = $this->bibliothequeRepository->findAll();
+        } else {
+            // Les non-super_admin ne voient que les bibliothèques actives (pour les demandes de migration)
+            $bibliotheques = $this->bibliothequeRepository->findBy(['active' => true]);
+        }
+
+        return $this->json($bibliotheques, Response::HTTP_OK, [], ['groups' => ['bibliotheque:read']]);
     }
 
     #[Route('', name: 'api_bibliotheques_create', methods: ['POST'])]
@@ -49,7 +58,7 @@ class BibliothequeController extends AbstractController
         $bibliotheque->setNom($data['nom']);
         $bibliotheque->setAdresse($data['adresse'] ?? null);
         $bibliotheque->setVille($data['ville'] ?? null);
-        $bibliotheque->setCodePostal($data['codePostal'] ?? null);
+        $bibliotheque->setCodePostal($data['code_postal'] ?? null);
         $bibliotheque->setEmail($data['email'] ?? null);
 
         $this->em->persist($bibliotheque);
@@ -93,11 +102,11 @@ class BibliothequeController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        if (!empty($data['nom']))       $bibliotheque->setNom($data['nom']);
-        if (array_key_exists('adresse', $data))    $bibliotheque->setAdresse($data['adresse']);
-        if (array_key_exists('ville', $data))      $bibliotheque->setVille($data['ville']);
-        if (array_key_exists('codePostal', $data)) $bibliotheque->setCodePostal($data['codePostal']);
-        if (array_key_exists('email', $data))      $bibliotheque->setEmail($data['email']);
+        if (!empty($data['nom']))            $bibliotheque->setNom($data['nom']);
+        if (array_key_exists('adresse', $data))     $bibliotheque->setAdresse($data['adresse']);
+        if (array_key_exists('ville', $data))       $bibliotheque->setVille($data['ville']);
+        if (array_key_exists('code_postal', $data)) $bibliotheque->setCodePostal($data['code_postal']);
+        if (array_key_exists('email', $data))       $bibliotheque->setEmail($data['email']);
         if (!empty($data['duret_pret_jours']) && is_int($data['duret_pret_jours']) && $data['duret_pret_jours'] > 0) {
             $bibliotheque->setDuretPretJours((int) $data['duret_pret_jours']);
         }

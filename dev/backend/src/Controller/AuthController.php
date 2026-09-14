@@ -8,26 +8,42 @@ use App\Repository\UtilisateurRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api')]
 class AuthController extends AbstractController
 {
     public function __construct(
-        private readonly UtilisateurRepository  $utilisateurRepository,
-        private readonly RefreshTokenRepository $refreshTokenRepository,
+        private readonly UtilisateurRepository       $utilisateurRepository,
+        private readonly RefreshTokenRepository      $refreshTokenRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly JWTTokenManagerInterface    $jwtManager,
         private readonly EntityManagerInterface      $em,
+        #[Target('loginIp')]
+        private readonly RateLimiterFactory          $loginIpLimiter,
     ) {}
 
     #[Route('/login', name: 'api_login', methods: ['POST'])]
     public function login(Request $request): JsonResponse
     {
+        // Rate limiter par IP (sliding window : 10 req / 5 min)
+        $ipLimiter = $this->loginIpLimiter->create($request->getClientIp() ?? 'unknown');
+        $ipLimit   = $ipLimiter->consume(1);
+        if (!$ipLimit->isAccepted()) {
+            return $this->json([
+                'status'      => 429,
+                'code'        => 'RATE_LIMIT_EXCEEDED',
+                'message'     => 'Trop de tentatives depuis cette adresse IP. Réessayez dans ' . ceil($ipLimit->getRetryAfter()->getTimestamp() - time()) . ' secondes.',
+                'retry_after' => $ipLimit->getRetryAfter()->getTimestamp() - time(),
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['email']) || empty($data['password'])) {
