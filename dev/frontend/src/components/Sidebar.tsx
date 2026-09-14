@@ -56,7 +56,7 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: SidebarProps) {
   const { user, logout } = useAuth()
-  const { currentVersion } = useCgu()
+  const { currentVersion, pendingVersion, pendingDateEffet } = useCgu()
   const navigate = useNavigate()
 
   const visibleNavItems = navItems.filter(
@@ -164,6 +164,15 @@ export function Sidebar({ collapsed, onToggle, isMobileDrawer, onMobileClose }: 
 
       {/* ── Navigation ── */}
       <nav className={clsx('flex-1 space-y-0.5', effectiveCollapsed ? 'px-2' : 'px-3')}>
+        {/* Bandeau préavis CGU (version publiée non encore en vigueur) */}
+        {!effectiveCollapsed && pendingVersion && !cguMismatch && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs">
+            <DocumentTextIcon className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">
+              Nouvelles CGU le {pendingDateEffet ? new Date(pendingDateEffet).toLocaleDateString('fr-FR') : '—'}
+            </span>
+          </div>
+        )}
         {/* Bandeau acceptation requise */}
         {!effectiveCollapsed && cguMismatch && (
           <NavLink to="/premier-login/cgu" onClick={() => onMobileClose?.()}

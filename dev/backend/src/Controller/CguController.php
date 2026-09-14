@@ -74,10 +74,21 @@ class CguController extends AbstractController
             return $this->json(['status' => 409, 'code' => 'CGU_VERSION_DUPLICATE', 'message' => 'Une version de CGU avec ce numéro existe déjà.'], Response::HTTP_CONFLICT);
         }
 
+        try {
+            $dateEffet = new \DateTimeImmutable($data['date_effet']);
+        } catch (\Exception) {
+            return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Format de date invalide pour date_effet (attendu : YYYY-MM-DD).'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $minDate = new \DateTimeImmutable('+14 days');
+        if ($dateEffet < $minDate) {
+            return $this->json(['status' => 422, 'code' => 'CGU_NOTICE_PERIOD', 'message' => 'La date d\'effet doit être au moins 15 jours après aujourd\'hui (préavis obligatoire).'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $cgu = new CguVersion();
         $cgu->setVersion($data['version']);
         $cgu->setContenu($data['contenu']);
-        $cgu->setDateEffet(new \DateTimeImmutable($data['date_effet']));
+        $cgu->setDateEffet($dateEffet);
         $cgu->setPubliePar($user->getEmail());
 
         $this->em->persist($cgu);
