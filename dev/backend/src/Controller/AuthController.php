@@ -25,7 +25,7 @@ class AuthController extends AbstractController
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly JWTTokenManagerInterface    $jwtManager,
         private readonly EntityManagerInterface      $em,
-        #[Target('loginIp')]
+        #[Target('login_ip.limiter')]
         private readonly RateLimiterFactory          $loginIpLimiter,
     ) {}
 
