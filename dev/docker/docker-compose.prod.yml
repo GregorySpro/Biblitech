@@ -1,0 +1,84 @@
+version: '3.9'
+
+# ── BiblioTech — Docker Compose PRODUCTION ──────────────────────────────────
+#
+# Usage :
+#   cp .env.prod.example .env.prod   # créer et remplir les variables
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+#
+# Variables requises dans .env.prod :
+#   DATABASE_URL, POSTGRES_PASSWORD, JWT_PASSPHRASE (vide si image CI),
+#   GOOGLE_BOOKS_API_KEY, CORS_ALLOW_ORIGIN, VITE_API_URL
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Backend Symfony (PHP 8.3 + Nginx) ───────────────────────────────────────
+  app:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    image: bibliotech-backend:prod
+    container_name: bibliotech_app_prod
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=prod
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
+      - JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
+      - JWT_PASSPHRASE=
+      - GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY:-}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - bibliotech_net
+
+  # ── Frontend React (Vite build → Nginx statique) ─────────────────────────────
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+    image: bibliotech-frontend:prod
+    container_name: bibliotech_front_prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      - bibliotech_net
+
+  # ── Base de données PostgreSQL (auto-hébergée) ───────────────────────────────
+  # Commenter ce service si vous utilisez une BDD externe (Supabase, AWS RDS…)
+  # et renseigner DATABASE_URL dans .env.prod en pointant vers votre BDD distante.
+  db:
+    image: postgres:16-alpine
+    container_name: bibliotech_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bibliotech
+      POSTGRES_USER: ${POSTGRES_USER:-bibliotech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bibliotech}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bibliotech_net
+
+volumes:
+  db_data:
+
+networks:
+  bibliotech_net:
+    name: bibliotech_prod_net
+    driver: bridge

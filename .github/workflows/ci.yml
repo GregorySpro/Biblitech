@@ -164,7 +164,10 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: dev/frontend
+          file: dev/frontend/Dockerfile.prod
           push: true
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/bibliotech-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/bibliotech-frontend:${{ steps.meta.outputs.version }}
