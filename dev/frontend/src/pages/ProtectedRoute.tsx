@@ -25,7 +25,8 @@ export function ProtectedRoute({ allowedRoles, requirePasswordChange = true, req
   }
 
   // Redirige vers l'acceptation des CGU si la version courante n'a pas été acceptée
-  if (requireCguAccepted && user && user.cgu_accepted_version !== currentVersion) {
+  // currentVersion === null signifie que le chargement est en cours → on ne redirige pas encore
+  if (requireCguAccepted && user && currentVersion !== null && user.cgu_accepted_version !== currentVersion) {
     return <Navigate to="/premier-login/cgu" replace />
   }
 
