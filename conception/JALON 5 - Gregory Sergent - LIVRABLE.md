@@ -418,26 +418,23 @@ Chaque endpoint vérifie le rôle **et** le `bibliotheque_id` du token. Un utili
 | `bibliothecaire` | Catalogue + prêts de sa bibliothèque | `bibliotheque_id` du token |
 | `adherent` | Lecture catalogue + ses propres prêts | `bibliotheque_id` + `sub` du token |
 
-Implémentation via un `AttributeVoter` Symfony sur chaque route sensible :
+Implémentation directement dans chaque contrôleur via des vérifications explicites sur `getRole()` et `getBibliothequeId()` extraits du JWT :
 
 ```php
-// Exemple : vérification dans PretController
-$this->denyAccessUnlessGranted('PRET_ACCESS', $pret);
+// Exemple réel : PretController — GET /api/prets/{id}
+$user = $this->security->getUser();
 
-// BiblioTechVoter.php
-protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
-{
-    $user = $token->getUser();
-    if ($attribute === 'PRET_ACCESS') {
-        // Un adhérent ne peut voir que ses propres prêts
-        if ($user->getRole() === 'adherent') {
-            return $subject->getUtilisateur()->getId() === $user->getId();
-        }
-        // Staff : isolation par bibliothèque
-        return $subject->getExemplaire()->getLivre()->getBibliotheque()->getId()
-            === $user->getBibliothequeId();
+// Un adhérent ne peut voir que ses propres prêts
+if ($user->getRole() === 'adherent' && $pret->getUtilisateur()->getId() !== $user->getId()) {
+    return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', ...], Response::HTTP_FORBIDDEN);
+}
+
+// Isolation multi-tenant : staff limité à sa propre bibliothèque
+if ($user->getBibliothequeId() !== null) {
+    $pretBibId = $pret->getExemplaire()->getLivre()->getBibliotheque()->getId();
+    if ($pretBibId !== $user->getBibliothequeId()) {
+        return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', ...], Response::HTTP_FORBIDDEN);
     }
-    return false;
 }
 ```
 
@@ -445,7 +442,7 @@ protected function voteOnAttribute(string $attribute, mixed $subject, TokenInter
 
 | Menace OWASP | Contre-mesure implémentée |
 |---|---|
-| **A01 - Broken Access Control** | RBAC strict via AttributeVoter Symfony + isolation `bibliotheque_id` |
+| **A01 - Broken Access Control** | RBAC strict via vérifications `getRole()` + `getBibliothequeId()` dans chaque contrôleur ; isolation multi-tenant |
 | **A02 - Cryptographic Failures** | Argon2id (mots de passe), RS256 (JWT), HTTPS enforced en production |
 | **A03 - Injection SQL** | Doctrine ORM + requêtes préparées uniquement. Aucun SQL dynamique sans paramètres |
 | **A04 - Insecure Design** | Architecture stateless JWT, séparation frontend/backend, validation des DTOs |
@@ -458,22 +455,34 @@ protected function voteOnAttribute(string $attribute, mixed $subject, TokenInter
 
 ### 4.4 Validation des entrées
 
-Toutes les entrées utilisateur passent par des **DTOs validés** avec les contraintes Symfony Validator avant d'atteindre la logique métier :
+Toutes les entrées utilisateur sont validées directement dans les contrôleurs avant d'atteindre la logique métier. Chaque champ obligatoire est vérifié explicitement, avec un code d'erreur structuré en cas d'échec :
 
 ```php
-// CreatePretDTO.php — exemple de validation
-class CreatePretDTO
-{
-    #[NotBlank]
-    #[Positive]
-    public int $exemplaire_id;
+// Exemple réel : PretController — POST /api/prets
+$data = json_decode($request->getContent(), true);
 
-    #[NotBlank]
-    #[Positive]
-    public int $utilisateur_id;
+if (empty($data['exemplaire_id'])) {
+    return $this->json(
+        ['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'exemplaire_id est obligatoire.'],
+        Response::HTTP_BAD_REQUEST
+    );
+}
 
-    #[Type('datetime')]
-    public ?DateTimeImmutable $date_retour_prevue = null;
+// Résolution de l'utilisateur via email ou utilisateur_id
+if (!empty($data['email'])) {
+    $utilisateur = $this->utilisateurRepository->findByEmail($data['email']);
+    if ($utilisateur === null) {
+        return $this->json(['status' => 404, 'code' => 'USER_NOT_FOUND', ...], Response::HTTP_NOT_FOUND);
+    }
+} elseif (!empty($data['utilisateur_id'])) {
+    $utilisateur = $this->utilisateurRepository->find($data['utilisateur_id']);
+}
+
+if ($utilisateur === null) {
+    return $this->json(
+        ['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'email ou utilisateur_id est obligatoire.'],
+        Response::HTTP_BAD_REQUEST
+    );
 }
 ```
 
@@ -682,8 +691,6 @@ DATABASE_URL=postgresql://bibliotech:secret@db:5432/bibliotech
 | **Déploiement production** | ✅ Opérationnel | Backend Docker sur Render, frontend statique sur Render, BDD Supabase |
 
 ---
-
-## 8) Conclusion
 
 ## 8) Conclusion
 
