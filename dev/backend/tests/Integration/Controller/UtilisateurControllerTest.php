@@ -149,7 +149,8 @@ class UtilisateurControllerTest extends WebTestCase
             'nom'      => 'User',
             'prenom'   => 'First',
             'email'    => $email,
-            'password' => 'pass123',
+            'password' => 'SecurePassword123!',
+            'role'     => 'adherent',
         ]));
 
         $this->client->request('POST', '/api/utilisateurs', [], [], [
@@ -159,7 +160,8 @@ class UtilisateurControllerTest extends WebTestCase
             'nom'      => 'User',
             'prenom'   => 'Second',
             'email'    => $email,
-            'password' => 'pass123',
+            'password' => 'SecurePassword123!',
+            'role'     => 'adherent',
         ]));
 
         $this->assertResponseStatusCodeSame(409);
@@ -218,7 +220,8 @@ class UtilisateurControllerTest extends WebTestCase
             'nom'      => 'ToDelete',
             'prenom'   => 'User',
             'email'    => 'todelete_' . time() . '@test.fr',
-            'password' => 'pass123',
+            'password' => 'SecurePassword123!',
+            'role'     => 'adherent',
         ]));
         $id = json_decode($this->client->getResponse()->getContent(), true)['id'];
 
