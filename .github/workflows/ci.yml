@@ -93,6 +93,8 @@ jobs:
       - name: Run PHPUnit tests
         env:
           APP_ENV: test
+          DATABASE_URL: "postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@127.0.0.1:5432/${{ env.POSTGRES_DB }}?serverVersion=16&charset=utf8"
+          CORS_ALLOW_ORIGIN: ".*"
         run: php bin/phpunit --testdox
 
 # ──────────────────────────────────────────────────────────────────────────────
