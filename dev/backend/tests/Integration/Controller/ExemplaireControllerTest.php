@@ -123,9 +123,21 @@ class ExemplaireControllerTest extends WebTestCase
 
     public function testUpdateExemplaire(): void
     {
-        $this->client->request('PUT', "/api/exemplaires/{$this->exemplaireId}", [], [], [
+        $token = $this->getToken('bibliothecaire');
+
+        // Create a dedicated exemplaire so fixture exemplaires remain disponible for PretControllerTest
+        $this->client->request('POST', '/api/exemplaires', [], [], [
             'CONTENT_TYPE'       => 'application/json',
-            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('bibliothecaire'),
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
+        ], json_encode([
+            'livreId'        => $this->livreId,
+            'codeExemplaire' => 'EX-UPD-' . time(),
+        ]));
+        $id = json_decode($this->client->getResponse()->getContent(), true)['id'];
+
+        $this->client->request('PUT', "/api/exemplaires/{$id}", [], [], [
+            'CONTENT_TYPE'       => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
         ], json_encode([
             'statut' => 'emprunte',
         ]));

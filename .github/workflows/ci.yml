@@ -95,6 +95,9 @@ jobs:
           APP_ENV: test
           DATABASE_URL: "postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@127.0.0.1:5432/${{ env.POSTGRES_DB }}?serverVersion=16&charset=utf8"
           CORS_ALLOW_ORIGIN: ".*"
+          JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+          JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+          JWT_PASSPHRASE: "change_me_jwt_passphrase"
         run: php bin/phpunit --testdox
 
 # ──────────────────────────────────────────────────────────────────────────────
