@@ -2,56 +2,58 @@
 
 namespace App\Tests\Integration\Controller;
 
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class BibliothequeControllerTest extends WebTestCase
 {
+    private KernelBrowser $client;
     private int $bibliothequeId = 1;
 
-    /** Generate test JWT token for given role. */
+    protected function setUp(): void
+    {
+        $this->client = static::createClient();
+    }
+
     private function getToken(string $role): string
     {
-        $client = static::createClient();
         $emails = [
             'adherent'       => 'adherent@test.fr',
             'bibliothecaire' => 'bibliothecaire@test.fr',
             'admin'          => 'admin@test.fr',
         ];
-        $client->request('POST', '/api/login', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
+        $this->client->request('POST', '/api/login', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode([
             'email'    => $emails[$role],
             'password' => 'password',
         ]));
-        return json_decode($client->getResponse()->getContent(), true)['token'];
+        return json_decode($this->client->getResponse()->getContent(), true)['token'];
     }
 
     public function testListBibliothequesSuperAdminOnly(): void
     {
-        $client = static::createClient();
-        $client->request('GET', '/api/bibliotheques', [], [], [
+        $this->client->request('GET', '/api/bibliotheques', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ]);
 
         $this->assertResponseStatusCodeSame(403);
-        $data = json_decode($client->getResponse()->getContent(), true);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertSame('ACCESS_DENIED', $data['code']);
     }
 
     public function testGetBibliothequeByIdAdmin(): void
     {
-        $client = static::createClient();
-        $client->request('GET', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
+        $this->client->request('GET', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ]);
 
         $this->assertResponseIsSuccessful();
-        $data = json_decode($client->getResponse()->getContent(), true);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('nom', $data);
     }
 
     public function testGetBibliothequeByIdAdherentForbidden(): void
     {
-        $client = static::createClient();
-        $client->request('GET', '/api/bibliotheques/999', [], [], [
+        $this->client->request('GET', '/api/bibliotheques/999', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('adherent'),
         ]);
 
@@ -60,13 +62,12 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testCreateBibliothequeAdminForbidden(): void
     {
-        $client = static::createClient();
-        $client->request('POST', '/api/bibliotheques', [], [], [
+        $this->client->request('POST', '/api/bibliotheques', [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ], json_encode([
-            'nom'     => 'New Library',
-            'ville'   => 'Paris',
+            'nom'   => 'New Library',
+            'ville' => 'Paris',
         ]));
 
         $this->assertResponseStatusCodeSame(403);
@@ -74,12 +75,10 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testCreateBibliothequeValidation(): void
     {
-        $client = static::createClient();
-        $client->request('POST', '/api/bibliotheques', [], [], [
+        $this->client->request('POST', '/api/bibliotheques', [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ], json_encode([
-            // Missing 'nom'
             'ville' => 'Paris',
         ]));
 
@@ -88,8 +87,7 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testUpdateBibliothequeAdmin(): void
     {
-        $client = static::createClient();
-        $client->request('PUT', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
+        $this->client->request('PUT', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ], json_encode([
@@ -97,14 +95,13 @@ class BibliothequeControllerTest extends WebTestCase
         ]));
 
         $this->assertResponseIsSuccessful();
-        $data = json_decode($client->getResponse()->getContent(), true);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertSame('Updated Library Name', $data['nom']);
     }
 
     public function testUpdateBibliothequeAdherentForbidden(): void
     {
-        $client = static::createClient();
-        $client->request('PUT', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
+        $this->client->request('PUT', "/api/bibliotheques/{$this->bibliothequeId}", [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('adherent'),
         ], json_encode([
@@ -116,8 +113,7 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testToggleBibliothequeActive(): void
     {
-        $client = static::createClient();
-        $client->request('PATCH', "/api/bibliotheques/{$this->bibliothequeId}/activer", [], [], [
+        $this->client->request('PATCH', "/api/bibliotheques/{$this->bibliothequeId}/activer", [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ], json_encode([
@@ -129,13 +125,12 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testGetBibliothequeNotFound(): void
     {
-        $client = static::createClient();
-        $client->request('GET', '/api/bibliotheques/99999', [], [], [
+        $this->client->request('GET', '/api/bibliotheques/99999', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ]);
 
         $this->assertResponseStatusCodeSame(404);
-        $data = json_decode($client->getResponse()->getContent(), true);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertSame('BIBLIOTHEQUE_NOT_FOUND', $data['code']);
     }
 }
