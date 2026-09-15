@@ -10,6 +10,7 @@
         <server name="SHELL_VERBOSITY" value="-1"/>
         <env name="KERNEL_CLASS" value="App\Kernel" force="true"/>
         <server name="DEFAULT_URI" value="http://localhost" force="true"/>
+        <env name="CORS_ALLOW_ORIGIN" value=".*" force="true"/>
     </php>
     <testsuites>
         <testsuite name="Unit">
