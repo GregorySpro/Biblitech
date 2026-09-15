@@ -26,3 +26,12 @@ when@test:
         test: true
         session:
             storage_factory_id: session.storage.factory.mock_file
+        rate_limiter:
+            login_ip:
+                policy: fixed_window
+                limit: 10000
+                interval: '1 hour'
+            login_user:
+                policy: fixed_window
+                limit: 10000
+                interval: '1 hour'
