@@ -76,7 +76,6 @@ class GoogleBooksServiceTest extends TestCase
         $this->expectException(GoogleBooksApiException::class);
 
         $transportException = $this->createMock(TransportExceptionInterface::class);
-        $transportException->method('getMessage')->willReturn('Connection timeout');
 
         $this->httpClient->method('request')->willThrowException($transportException);
 
@@ -97,7 +96,7 @@ class GoogleBooksServiceTest extends TestCase
     {
         $this->expectException(\RuntimeException::class);
 
-        new GoogleBooksService($this->httpClient, '');
+        (new GoogleBooksService($this->httpClient, ''))->rechercherParIsbn('9782070612758');
     }
 
     public function testMappingMetadonnees(): void
