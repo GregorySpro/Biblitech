@@ -35,9 +35,10 @@ class BibliothequeControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('admin'),
         ]);
 
-        $this->assertResponseStatusCodeSame(403);
+        // Non-super_admin users receive the list of active libraries (for migration requests)
+        $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame('ACCESS_DENIED', $data['code']);
+        $this->assertIsArray($data);
     }
 
     public function testGetBibliothequeByIdAdmin(): void
@@ -53,7 +54,8 @@ class BibliothequeControllerTest extends WebTestCase
 
     public function testGetBibliothequeByIdAdherentForbidden(): void
     {
-        $this->client->request('GET', '/api/bibliotheques/999', [], [], [
+        // biblio2 (id=2) exists but adherent belongs to biblio1 → 403
+        $this->client->request('GET', '/api/bibliotheques/2', [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('adherent'),
         ]);
 
