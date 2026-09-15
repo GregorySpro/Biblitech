@@ -51,7 +51,7 @@ class AppFixtures extends Fixture
         $superAdmin->setNom('Admin');
         $superAdmin->setPrenom('Super');
         $superAdmin->setEmail('superadmin@test.fr');
-        $superAdmin->setPassword($this->passwordHasher->hashPassword($superAdmin, 'Admin1234!'));
+        $superAdmin->setPassword($this->passwordHasher->hashPassword($superAdmin, 'password'));
         $superAdmin->setRole(Utilisateur::ROLE_SUPER_ADMIN);
         $superAdmin->setMustChangePassword(false);
         $superAdmin->setCguAcceptedVersion('1.0');
@@ -62,7 +62,7 @@ class AppFixtures extends Fixture
         $admin->setNom('Dupont');
         $admin->setPrenom('Marie');
         $admin->setEmail('admin@test.fr');
-        $admin->setPassword($this->passwordHasher->hashPassword($admin, 'Admin1234!'));
+        $admin->setPassword($this->passwordHasher->hashPassword($admin, 'password'));
         $admin->setRole(Utilisateur::ROLE_ADMIN);
         $admin->setBibliotheque($biblio1);
         $admin->setMustChangePassword(false);
@@ -74,7 +74,7 @@ class AppFixtures extends Fixture
         $bibliothecaire->setNom('Martin');
         $bibliothecaire->setPrenom('Jean');
         $bibliothecaire->setEmail('bibliothecaire@test.fr');
-        $bibliothecaire->setPassword($this->passwordHasher->hashPassword($bibliothecaire, 'Biblio1234!'));
+        $bibliothecaire->setPassword($this->passwordHasher->hashPassword($bibliothecaire, 'password'));
         $bibliothecaire->setRole(Utilisateur::ROLE_BIBLIOTHECAIRE);
         $bibliothecaire->setBibliotheque($biblio1);
         $bibliothecaire->setMustChangePassword(false);
@@ -86,7 +86,7 @@ class AppFixtures extends Fixture
         $adherent1->setNom('Bernard');
         $adherent1->setPrenom('Alice');
         $adherent1->setEmail('adherent@test.fr');
-        $adherent1->setPassword($this->passwordHasher->hashPassword($adherent1, 'Adherent1234!'));
+        $adherent1->setPassword($this->passwordHasher->hashPassword($adherent1, 'password'));
         $adherent1->setRole(Utilisateur::ROLE_ADHERENT);
         $adherent1->setBibliotheque($biblio1);
         $adherent1->setMustChangePassword(false);
@@ -97,7 +97,7 @@ class AppFixtures extends Fixture
         $adherent2->setNom('Moreau');
         $adherent2->setPrenom('Paul');
         $adherent2->setEmail('adherent2@test.fr');
-        $adherent2->setPassword($this->passwordHasher->hashPassword($adherent2, 'Adherent1234!'));
+        $adherent2->setPassword($this->passwordHasher->hashPassword($adherent2, 'password'));
         $adherent2->setRole(Utilisateur::ROLE_ADHERENT);
         $adherent2->setBibliotheque($biblio1);
         $adherent2->setMustChangePassword(false);
@@ -109,7 +109,7 @@ class AppFixtures extends Fixture
         $desactive->setNom('Inactif');
         $desactive->setPrenom('Compte');
         $desactive->setEmail('desactive@test.fr');
-        $desactive->setPassword($this->passwordHasher->hashPassword($desactive, 'Desactive1234!'));
+        $desactive->setPassword($this->passwordHasher->hashPassword($desactive, 'password'));
         $desactive->setRole(Utilisateur::ROLE_ADHERENT);
         $desactive->setBibliotheque($biblio1);
         $desactive->setActive(false);
@@ -121,7 +121,7 @@ class AppFixtures extends Fixture
         $premierLogin->setNom('Nouveau');
         $premierLogin->setPrenom('Compte');
         $premierLogin->setEmail('premier@test.fr');
-        $premierLogin->setPassword($this->passwordHasher->hashPassword($premierLogin, 'Temp1234!'));
+        $premierLogin->setPassword($this->passwordHasher->hashPassword($premierLogin, 'password'));
         $premierLogin->setRole(Utilisateur::ROLE_BIBLIOTHECAIRE);
         $premierLogin->setBibliotheque($biblio1);
         $premierLogin->setMustChangePassword(true);

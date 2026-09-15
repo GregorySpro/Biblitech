@@ -8,7 +8,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 class UtilisateurControllerTest extends WebTestCase
 {
     private KernelBrowser $client;
-    private int $adherentId = 3;
+    private int $adherentId = 4;
     private int $adminId = 2;
 
     protected function setUp(): void

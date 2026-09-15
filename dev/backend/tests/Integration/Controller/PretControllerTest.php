@@ -35,7 +35,7 @@ class PretControllerTest extends WebTestCase
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('bibliothecaire'),
         ], json_encode([
             'exemplaire_id'  => 1,
-            'utilisateur_id' => 3,
+            'utilisateur_id' => 4,
         ]));
 
         $this->assertResponseStatusCodeSame(201);
@@ -45,12 +45,13 @@ class PretControllerTest extends WebTestCase
 
     public function testPostPretExemplaireIndisponible(): void
     {
+        // exemplaire_id=1 is already loaned by testPostPretSucces
         $this->client->request('POST', '/api/prets', [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('bibliothecaire'),
         ], json_encode([
-            'exemplaire_id'  => 2,
-            'utilisateur_id' => 3,
+            'exemplaire_id'  => 1,
+            'utilisateur_id' => 4,
         ]));
 
         $this->assertResponseStatusCodeSame(409);
@@ -62,10 +63,11 @@ class PretControllerTest extends WebTestCase
     {
         $token = $this->getToken('bibliothecaire');
 
+        // use exemplaire_id=2 (disponible)
         $this->client->request('POST', '/api/prets', [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
-        ], json_encode(['exemplaire_id' => 1, 'utilisateur_id' => 3]));
+        ], json_encode(['exemplaire_id' => 2, 'utilisateur_id' => 4]));
         $pretId = json_decode($this->client->getResponse()->getContent(), true)['id'];
 
         $this->client->request('PATCH', "/api/prets/$pretId/retour", [], [], [
@@ -82,10 +84,11 @@ class PretControllerTest extends WebTestCase
     {
         $token = $this->getToken('bibliothecaire');
 
+        // use exemplaire_id=3 (disponible)
         $this->client->request('POST', '/api/prets', [], [], [
             'CONTENT_TYPE'       => 'application/json',
             'HTTP_AUTHORIZATION' => 'Bearer ' . $token,
-        ], json_encode(['exemplaire_id' => 1, 'utilisateur_id' => 3]));
+        ], json_encode(['exemplaire_id' => 3, 'utilisateur_id' => 4]));
         $pretId = json_decode($this->client->getResponse()->getContent(), true)['id'];
 
         $this->client->request('PATCH', "/api/prets/$pretId/retour", [], [], ['HTTP_AUTHORIZATION' => 'Bearer ' . $token]);
@@ -105,13 +108,20 @@ class PretControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
         foreach ($data as $pret) {
-            $this->assertSame(3, $pret['utilisateur']['id']);
+            $this->assertSame(4, $pret['utilisateur']['id']);
         }
     }
 
     public function testAdherentNeVoitPasAutresPrets(): void
     {
-        $this->client->request('GET', '/api/prets/5', [], [], [
+        // create a pret for adherent2 (id=5) to test access isolation
+        $this->client->request('POST', '/api/prets', [], [], [
+            'CONTENT_TYPE'       => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('bibliothecaire'),
+        ], json_encode(['exemplaire_id' => 4, 'utilisateur_id' => 5]));
+        $otherPretId = json_decode($this->client->getResponse()->getContent(), true)['id'];
+
+        $this->client->request('GET', "/api/prets/{$otherPretId}", [], [], [
             'HTTP_AUTHORIZATION' => 'Bearer ' . $this->getToken('adherent'),
         ]);
 
