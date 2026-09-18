@@ -12,10 +12,11 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Table(name: 'exemplaires')]
 class Exemplaire
 {
-    public const STATUT_DISPONIBLE  = 'disponible';
-    public const STATUT_EMPRUNTE    = 'emprunte';
+    public const STATUT_DISPONIBLE   = 'disponible';
+    public const STATUT_EMPRUNTE     = 'emprunte';
+    public const STATUT_INDISPONIBLE = 'indisponible';
     public const STATUT_HORS_SERVICE = 'hors_service';
-    public const STATUT_PERDU       = 'perdu';
+    public const STATUT_PERDU        = 'perdu';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
