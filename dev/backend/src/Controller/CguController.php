@@ -80,7 +80,7 @@ class CguController extends AbstractController
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Format de date invalide pour date_effet (attendu : YYYY-MM-DD).'], Response::HTTP_BAD_REQUEST);
         }
 
-        $minDate = new \DateTimeImmutable('+14 days');
+        $minDate = (new \DateTimeImmutable('today'))->modify('+15 days');
         if ($dateEffet < $minDate) {
             return $this->json(['status' => 422, 'code' => 'CGU_NOTICE_PERIOD', 'message' => 'La date d\'effet doit être au moins 15 jours après aujourd\'hui (préavis obligatoire).'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
