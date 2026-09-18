@@ -65,7 +65,7 @@ class ExemplaireControllerTest extends WebTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $data = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertNotEmpty($data['codeExemplaire']);
+        $this->assertNotEmpty($data['code_exemplaire']);
     }
 
     public function testCreateExemplaireAdherentInterdit(): void
@@ -118,7 +118,7 @@ class ExemplaireControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertIsArray($data);
-        $this->assertArrayHasKey('codeExemplaire', $data);
+        $this->assertArrayHasKey('code_exemplaire', $data);
     }
 
     public function testUpdateExemplaire(): void

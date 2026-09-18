@@ -77,7 +77,7 @@ class PretControllerTest extends WebTestCase
         $this->assertResponseIsSuccessful();
         $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertSame('rendu', $data['statut']);
-        $this->assertNotNull($data['dateRetourEffective']);
+        $this->assertNotNull($data['date_retour_effective']);
     }
 
     public function testPatchRetourDejaRendu(): void
