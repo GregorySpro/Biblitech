@@ -26,3 +26,4 @@ conception/package-lock.json
 Thumbs.db
 *.swp
 setup-git-history.ps1
+dev/backend/reset-cache.ps1

@@ -1,0 +1,255 @@
+@startuml BiblioTech-Sequence-Pret
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam defaultFontName Calibri
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceParticipantBorderColor #3B5998
+skinparam sequenceParticipantBackgroundColor #EEF4FF
+skinparam sequenceActorBackgroundColor #FDEBD0
+skinparam sequenceActorBorderColor #E67E22
+skinparam sequenceLifeLineBorderColor #AAAAAA
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+
+title Diagramme de séquence – Enregistrer un prêt
+
+actor "Bibliothécaire" as BIBLIO
+participant "React\n(Frontend)" as FRONT
+participant "PretController\n(Symfony)" as CTRL
+participant "PretService\n(Symfony)" as SVC
+participant "ExemplaireRepository" as REPO_EX
+participant "PretRepository" as REPO_PR
+database "PostgreSQL\n(Supabase)" as DB
+
+== Authentification préalable ==
+note over BIBLIO, FRONT: Bibliothécaire déjà connecté\nJWT valide (TTL 15 min)
+
+== Enregistrement du prêt ==
+
+BIBLIO -> FRONT : Saisit ISBN ou id_exemplaire\n+ id_adhérent
+FRONT -> CTRL : POST /api/prets\nAuthorization: Bearer {JWT}\n{exemplaire_id, adherent_id}
+
+CTRL -> CTRL : Valide le JWT\n(LexikJWT RS256)
+CTRL -> SVC : create(exemplaire_id, adherent_id)
+
+group Vérification exemplaire
+    SVC -> REPO_EX : findById(exemplaire_id)
+    REPO_EX -> DB : SELECT * FROM exemplaires\nWHERE id = ?
+    DB --> REPO_EX : Exemplaire
+    REPO_EX --> SVC : Exemplaire
+
+    alt Exemplaire non trouvé
+        SVC --> CTRL : 404
+        CTRL --> FRONT : 404 { message: "Exemplaire introuvable" }
+        FRONT --> BIBLIO : Affiche erreur
+    else etat ≠ "DISPONIBLE"
+        SVC --> CTRL : 409
+        CTRL --> FRONT : 409 { message: "Exemplaire non disponible" }
+        FRONT --> BIBLIO : Affiche erreur
+    end
+end
+
+group Création du prêt
+    note over SVC : duree = bibliotheque.duree_pret (défaut : 21j)
+    SVC -> REPO_PR : save(Pret)
+    REPO_PR -> DB : INSERT INTO prets\n(exemplaire_id, adherent_id,\nbibliotheque_id, date_pret,\ndate_retour_prevue, etat_depart)\nVALUES (...)
+    DB --> REPO_PR : Pret créé (id)
+    REPO_PR --> SVC : Pret
+
+    SVC -> REPO_EX : updateEtat(exemplaire_id, "EMPRUNTE")
+    REPO_EX -> DB : UPDATE exemplaires\nSET etat = 'EMPRUNTE'\nWHERE id = ?
+    DB --> REPO_EX : OK
+    REPO_EX --> SVC : OK
+end
+
+SVC --> CTRL : PretDTO (id, dates, etat_depart)
+CTRL --> FRONT : 201 Created\n{ pret: PretDTO }
+FRONT --> BIBLIO : "Prêt enregistré – retour prévu le JJ/MM/AAAA"
+
+@enduml
+
+
+@startuml BiblioTech-Sequence-ISBN
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam defaultFontName Calibri
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceParticipantBorderColor #3B5998
+skinparam sequenceParticipantBackgroundColor #EEF4FF
+skinparam sequenceActorBackgroundColor #FDEBD0
+skinparam sequenceActorBorderColor #E67E22
+skinparam sequenceLifeLineBorderColor #AAAAAA
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+
+title Diagramme de séquence – Ajouter un livre via ISBN (Google Books API)
+
+actor "Bibliothécaire" as BIBLIO
+participant "React\n(Frontend)" as FRONT
+participant "LivreController\n(Symfony)" as CTRL
+participant "GoogleBooksService\n(Symfony)" as GBSVC
+participant "LivreService\n(Symfony)" as SVC
+participant "LivreRepository" as REPO
+database "PostgreSQL\n(Supabase)" as DB
+participant "Google Books API" as GBOOKS
+
+== Saisie de l'ISBN ==
+
+BIBLIO -> FRONT : Saisit ISBN-13
+FRONT -> CTRL : GET /api/livres/isbn/{isbn}\nAuthorization: Bearer {JWT}
+
+CTRL -> REPO : findByIsbn(isbn)
+REPO -> DB : SELECT * FROM livres\nWHERE isbn = ?
+DB --> REPO : null (livre inexistant)
+REPO --> CTRL : null
+
+note over CTRL : Livre absent du catalogue\n→ appel API externe
+
+CTRL -> GBSVC : fetchByIsbn(isbn)
+GBSVC -> GBOOKS : GET googleapis.com/books/v1\n/volumes?q=isbn:{isbn}&key={API_KEY}
+
+alt Livre trouvé dans Google Books
+    GBOOKS --> GBSVC : JSON { titre, auteur,\néditeur, annee, résumé,\ncouverture_url }
+    GBSVC --> CTRL : LivreMetadataDTO
+    CTRL --> FRONT : 200 { livre: LivreMetadataDTO,\nsource: "google_books" }
+    FRONT --> BIBLIO : Pré-remplit le formulaire\n(titre, auteur, résumé, couverture)
+
+    == Confirmation et enregistrement ==
+
+    BIBLIO -> FRONT : Vérifie, complète si besoin\nclique "Enregistrer"
+    FRONT -> CTRL : POST /api/livres\n{ isbn, titre, auteur, éditeur,\nannee_publication, genre,\nresume, couverture_url }
+    CTRL -> SVC : creerLivre(dto)
+    SVC -> REPO : save(Livre)
+    REPO -> DB : INSERT INTO livres (...)\nVALUES (...)
+    DB --> REPO : Livre créé (id)
+    REPO --> SVC : Livre
+    SVC --> CTRL : LivreDTO
+    CTRL --> FRONT : 201 Created { livre: LivreDTO }
+    FRONT --> BIBLIO : "Livre ajouté au catalogue"
+
+else ISBN introuvable dans Google Books
+    GBOOKS --> GBSVC : 404 / volumeInfo vide
+    GBSVC --> CTRL : null
+    CTRL --> FRONT : 404 { message: "ISBN non trouvé –\nsaisie manuelle requise" }
+    FRONT --> BIBLIO : Affiche formulaire vide\npour saisie manuelle
+end
+
+@enduml
+
+
+@startuml BiblioTech-Sequence-Login
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+skinparam defaultFontName Calibri
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceParticipantBorderColor #3B5998
+skinparam sequenceParticipantBackgroundColor #EEF4FF
+skinparam sequenceActorBackgroundColor #FDEBD0
+skinparam sequenceActorBorderColor #E67E22
+skinparam sequenceLifeLineBorderColor #AAAAAA
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+
+title Diagramme de séquence – Connexion / Authentification JWT + Refresh Token
+
+actor "Utilisateur" as USER
+participant "React\n(Frontend)" as FRONT
+participant "AuthController\n(Symfony)" as AUTH
+participant "UtilisateurRepository" as REPO
+participant "JWTManager\n(LexikJWT)" as JWT
+participant "RefreshTokenRepository" as REPO_RT
+database "PostgreSQL\n(Supabase)" as DB
+
+USER -> FRONT : Saisit email + mot de passe\nclique "Se connecter"
+FRONT -> AUTH : POST /api/auth/login\n{ email, password }
+
+AUTH -> REPO : findByEmail(email)
+REPO -> DB : SELECT * FROM utilisateurs\nWHERE email = ?
+DB --> REPO : Utilisateur (ou null)
+REPO --> AUTH : Utilisateur
+
+alt Utilisateur introuvable
+    AUTH --> FRONT : 401 { message: "Identifiants invalides" }
+    FRONT --> USER : Affiche erreur
+else Compte désactivé (actif = false)
+    AUTH --> FRONT : 403 { message: "Compte désactivé" }
+    FRONT --> USER : Affiche erreur
+else Compte verrouillé (lockedUntil > now)
+    AUTH --> FRONT : 429 { message: "Compte verrouillé\nRéessayez dans X min" }
+    FRONT --> USER : Affiche erreur brute-force
+else Mot de passe incorrect
+    AUTH -> AUTH : Argon2id verify → false
+    AUTH -> REPO : incrementLoginAttempts(id)
+    note right : Si loginAttempts >= 5\nlockedUntil = now + 15 min
+    REPO -> DB : UPDATE utilisateurs\nSET login_attempts = ?,\nlocked_until = ?\nWHERE id = ?
+    DB --> REPO : OK
+    AUTH --> FRONT : 401 { message: "Identifiants invalides" }
+    FRONT --> USER : Affiche erreur
+else Authentification réussie
+    AUTH -> REPO : resetLoginAttempts(id)
+    REPO -> DB : UPDATE utilisateurs\nSET login_attempts = 0,\nlocked_until = NULL
+    DB --> REPO : OK
+
+    AUTH -> JWT : createToken(Utilisateur)
+    note right of JWT : Payload JWT :\n{ sub: id, email,\nrole, bibliotheque_id,\nexp: now + 900s (15 min) }
+    JWT --> AUTH : access_token (JWT RS256 4096-bit)
+
+    AUTH -> REPO_RT : createRefreshToken(utilisateur)
+    REPO_RT -> DB : INSERT INTO refresh_tokens\n(token, utilisateur_id,\nexpires_at = now + 30j)
+    DB --> REPO_RT : RefreshToken
+    REPO_RT --> AUTH : refresh_token (UUID)
+
+    AUTH --> FRONT : 200 {\n  access_token: "eyJ...",\n  refresh_token: "uuid...",\n  force_password_change: bool,\n  cgu_accepted: bool,\n  user: { id, nom, prenom,\n  email, role, bibliotheque_id }\n}
+
+    alt force_password_change = true
+        FRONT --> USER : Redirige vers\n/premier-login/mot-de-passe
+    else cgu_accepted = false
+        FRONT --> USER : Redirige vers\n/premier-login/cgu
+    else
+        FRONT -> FRONT : Stocke tokens\n(mémoire + httpOnly cookie)
+        FRONT --> USER : Redirige vers dashboard\nselon rôle
+    end
+end
+
+== Renouvellement silencieux (Refresh Token) ==
+
+note over FRONT : access_token expiré ou proche expiration
+FRONT -> AUTH : POST /api/auth/refresh\n{ refresh_token: "uuid..." }
+
+AUTH -> REPO_RT : findValidToken(token)
+REPO_RT -> DB : SELECT * FROM refresh_tokens\nWHERE token = ? AND\nrevoked_at IS NULL\nAND expires_at > now
+DB --> REPO_RT : RefreshToken (ou null)
+REPO_RT --> AUTH : RefreshToken
+
+alt Token invalide / expiré / révoqué
+    AUTH --> FRONT : 401 { message: "Session expirée" }
+    FRONT --> USER : Redirige vers /login
+else Token valide (rotation)
+    AUTH -> REPO_RT : revoke(old_token)
+    AUTH -> REPO_RT : createRefreshToken(utilisateur)
+    AUTH -> JWT : createToken(Utilisateur)
+    AUTH --> FRONT : 200 {\n  access_token: "eyJ...",\n  refresh_token: "uuid_nouveau..."\n}
+    FRONT -> FRONT : Met à jour les tokens
+end
+
+== Déconnexion ==
+
+USER -> FRONT : Clique "Se déconnecter"
+FRONT -> AUTH : POST /api/auth/logout\nAuthorization: Bearer {JWT}
+AUTH -> REPO_RT : revokeByUser(utilisateur)
+REPO_RT -> DB : UPDATE refresh_tokens\nSET revoked_at = now\nWHERE utilisateur_id = ?
+DB --> REPO_RT : OK
+AUTH --> FRONT : 200 { message: "Déconnecté" }
+FRONT -> FRONT : Supprime les tokens
+FRONT --> USER : Redirige vers /login
+
+@enduml
