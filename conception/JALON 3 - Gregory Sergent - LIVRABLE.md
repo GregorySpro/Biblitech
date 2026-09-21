@@ -10,7 +10,19 @@
 
 ## Sommaire
 
-*(À générer dans Google Docs : **Insertion → Table des matières**)*
+0. Évolution du périmètre fonctionnel
+1. Introduction – Démarche MERISE (MCD → MLD → MPD)
+2. Dictionnaire des données
+   - 2.1 bibliotheques
+   - 2.2 utilisateurs
+   - 2.3 livres
+   - 2.4 exemplaires
+   - 2.5 prets
+   - 2.6 demandes_migration
+3. MCD – Modèle Conceptuel de Données
+4. MLD – Modèle Logique de Données
+5. MPD – Modèle Physique de Données (PostgreSQL)
+6. Justifications de modélisation
 
 ---
 

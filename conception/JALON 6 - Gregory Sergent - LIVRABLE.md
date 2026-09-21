@@ -44,6 +44,8 @@
 
 Ce livrable constitue le **Jalon 6 et livrable final** du projet BiblioTech. Il couvre les thèmes imposés par le CDC pour la phase de déploiement et mise en production : audit de sécurité complet, pipeline CI/CD, conteneurisation finale et instructions de déploiement.
 
+**Tag Git release :** `v1.0.0` — posé sur `main` après merge de `develop`.
+
 ### Rappel des jalons précédents
 
 | Jalon | Mois | Contenu |
@@ -365,7 +367,7 @@ docker compose exec app php bin/console doctrine:migrations:migrate --no-interac
 | `JWT_PASSPHRASE` | Passphrase des clés RSA JWT | Chaîne aléatoire 64+ caractères |
 | `JWT_SECRET_KEY` | Chemin vers la clé privée | `%kernel.project_dir%/config/jwt/private.pem` |
 | `JWT_PUBLIC_KEY` | Chemin vers la clé publique | `%kernel.project_dir%/config/jwt/public.pem` |
-| `GOOGLE_BOOKS_API_KEY` | Clé API Google Books | Obtenir sur console.developers.google.com |
+| `GOOGLE_BOOKS_API_KEY` | Clé API Google Books | Obtenir sur console.developers.google.com — active l'enrichissement automatique par ISBN (fallback saisie manuelle si absente) |
 | `CORS_ALLOW_ORIGIN` | Origines CORS autorisées | `https://votre-domaine.com` |
 | `APP_ENV` | Environnement Symfony | `prod` |
 | `APP_SECRET` | Secret Symfony | Chaîne aléatoire 32 caractères |
@@ -475,7 +477,31 @@ php bin/phpunit --testdox
 
 ### Résultats CI
 
-La pipeline GitHub Actions exécute l'intégralité des tests à chaque push. Le badge de statut est visible sur le README du dépôt.
+```
+PHPUnit 11.x — Backend PHPUnit (GitHub Actions)
+
+Tests: 67, Assertions: 132, OK (67 tests, 8 suites)
+Time: ~2.1s
+
+✅ Backend — PHPUnit       : 67/67 green
+✅ Frontend — TypeScript   : tsc --noEmit OK
+```
+
+La pipeline GitHub Actions exécute l'intégralité des tests à chaque push sur `main` et `develop`. Tous les tests passent depuis le commit `b62c901` (branche `develop`, 2026-09-18).
+
+### Captures — CI et déploiement en production
+
+#### Pipeline GitHub Actions — tous les tests verts
+
+![CI GitHub Actions — 67/67 tests green](screens/11-ci-github-actions.png)
+
+#### Déploiement backend — Render Web Service
+
+![Render Dashboard — backend déployé](screens/12-render-dashboard.png)
+
+#### Base de données — Supabase PostgreSQL 16
+
+![Supabase — base de données BiblioTech](screens/13-supabase.png)
 
 ### Tests de sécurité
 

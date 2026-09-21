@@ -46,6 +46,9 @@
 
 Ce livrable constitue le **Jalon 5** du projet BiblioTech. Il couvre le développement complet du backend Symfony, l'implémentation des mesures de sécurité, et la stratégie de tests appliquée.
 
+> **Note d'évolution architecturale — Tauri → Application web**
+> Le Jalon 1 envisageait BiblioTech comme une application **desktop native Tauri** (livrable `.exe`/`.msi`, mode hors connexion partiel). Au cours du développement, ce choix a été abandonné au profit d'une **SPA React + Vite déployée sur le web** (Render), pour trois raisons : (1) la complexité du pipeline de build Tauri sur Windows en développement solo dépassait le périmètre pédagogique du projet ; (2) un déploiement web simplifie considérablement la CI/CD, la mise en production et la démonstration aux évaluateurs ; (3) les fonctionnalités clés — catalogue, gestion des prêts, administration — ne nécessitent pas d'accès hors ligne. Les contraintes initiales d'installateur natif et de mode offline ont donc été abandonnées. L'application est conforme au CDC technique pour toutes les autres exigences (API REST Symfony, React, PostgreSQL, Docker, CI/CD, sécurité, tests).
+
 Les jalons précédents avaient posé les bases :
 
 - **Jalon 1** : Cahier des charges fonctionnel
@@ -139,7 +142,7 @@ backend/
 | `Bibliotheque` | `bibliotheques` | `duret_pret_jours` (durée de prêt configurable par bibliothèque) |
 | `Utilisateur` | `utilisateurs` | `must_change_password`, `cgu_accepted_version`, `prets_suspendus`, `login_attempts`, `locked_until` |
 | `Livre` | `livres` | — |
-| `Exemplaire` | `exemplaires` | constante `STATUT_PERDU` |
+| `Exemplaire` | `exemplaires` | constantes `STATUT_INDISPONIBLE`, `STATUT_PERDU` |
 | `Pret` | `prets` | `STATUT_PERDU`, `etat_depart`, `etat_retour` |
 | `CguVersion` | `cgu_versions` | `version`, `contenu` (TEXT brut, paragraphes séparés par `\n`), `date_effet`, `date_publication`, `publie_par` |
 | `DemandeMigration` | `demandes_migration` | — |
@@ -230,7 +233,7 @@ backend/
 - Gestion des cas : ISBN introuvable (404), timeout (500), quota dépassé
 - Fallback documenté : si l'appel échoue, l'utilisateur bascule sur la saisie manuelle
 
-> **Note :** La clé API Google Books n'est pas encore configurée en environnement de production. Le fallback saisie manuelle reste l'option par défaut jusqu'à la configuration de la clé.
+> **Note :** Le service `GoogleBooksService` est pleinement implémenté et fonctionnel — il effectue de vraies requêtes HTTP vers `googleapis.com`. La variable d'environnement `GOOGLE_BOOKS_API_KEY` doit être renseignée dans `.env.local` (développement) ou dans les secrets du service de déploiement (production). La fonctionnalité est active dès que la clé est présente. En l'absence de clé, le service lève une exception explicite (`503`) et l'interface bascule automatiquement sur la saisie manuelle.
 
 ### 2.5 Frontend React (état d'avancement)
 
@@ -653,7 +656,7 @@ DATABASE_URL=postgresql://bibliotech:secret@db:5432/bibliotech
 
 | Pratique | Statut | Détail |
 |---|---|---|
-| **Gestion de version Git** | ✅ Opérationnel | Branching model : `develop` + branches `feat/*` par fonctionnalité. Merge `--no-ff` systématique. |
+| **Gestion de version Git** | ✅ Opérationnel | Branching model : `develop` + branches `feat/*` par fonctionnalité. Merge `--no-ff` systématique. Tag bêta : `v0.9.0` |
 | **Conventions de commit** | ✅ Appliquées | Convention Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`) sur toutes les branches |
 | **Tests automatisés (locaux)** | ✅ Opérationnel | 67 tests PHPUnit (8 suites) exécutables via `php bin/phpunit` |
 | **Pipeline CI GitHub Actions** | ✅ Opérationnel | `.github/workflows/ci.yml` — 3 jobs : `backend-tests` (PHPUnit + PostgreSQL), `frontend-lint` (TypeScript check), `docker-build` (build & push Docker Hub sur tags `v*`) |
@@ -667,6 +670,10 @@ DATABASE_URL=postgresql://bibliotech:secret@db:5432/bibliotech
 |---|---|---|
 | **Tests end-to-end automatisés** | ❌ Non mis en place | Les tests E2E (Playwright) sont prévus après stabilisation de la production. |
 | **Linting automatique frontend** | ⚠️ Partiel | TypeScript check (`tsc --noEmit`) intégré dans la CI ; ESLint exécuté manuellement. |
+
+#### Preuve CI — capture GitHub Actions
+
+![CI GitHub Actions — 67/67 tests green](screens/11-ci-github-actions.png)
 
 ---
 
@@ -686,7 +693,7 @@ DATABASE_URL=postgresql://bibliotech:secret@db:5432/bibliotech
 | **Tests** | ✅ 67 tests (8 suites) | Unitaires + intégration, PHPUnit, exécutés manuellement et en CI |
 | **Frontend React** | ✅ Complet | Toutes les pages + gestion des rôles + nouveaux flux |
 | **Connexion API ↔ Frontend** | ✅ Opérationnel | Appels axios réels, intercepteur 401, auto-refresh |
-| **Google Books API** | ⚠️ Partiel | Service implémenté, clé API non encore configurée — fallback saisie manuelle actif |
+| **Google Books API** | ✅ Implémentée | Service opérationnel (`GoogleBooksService`) — active dès que `GOOGLE_BOOKS_API_KEY` est renseignée. Fallback saisie manuelle si clé absente. |
 | **CI/CD automatisée** | ✅ Opérationnel | GitHub Actions : `backend-tests`, `frontend-lint`, `docker-build` (sur tags `v*`) |
 | **Déploiement production** | ✅ Opérationnel | Backend Docker sur Render, frontend statique sur Render, BDD Supabase |
 
@@ -712,3 +719,23 @@ Le Jalon 5 concrétise la vision technique posée lors des jalons précédents. 
 1. Réaliser les tests end-to-end Playwright sur l'application déployée
 2. Configurer la clé API Google Books en production
 3. Préparer la livraison finale
+
+---
+
+## Annexes
+
+### Annexe A — Diagramme de classes
+
+![Diagramme de classes BiblioTech](screens/14-uml-classes.png)
+
+---
+
+### Annexe B — Diagramme des cas d'utilisation
+
+![Diagramme des cas d'utilisation BiblioTech](screens/15-uml-usecases.png)
+
+---
+
+### Annexe C — Diagrammes de séquence
+
+![Diagrammes de séquence BiblioTech](screens/16-uml-sequences.png)

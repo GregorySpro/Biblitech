@@ -10,7 +10,19 @@
 
 ## Sommaire
 
-*(À générer dans Google Docs : **Insertion – Table des matières**)*
+1. Méthodologie et organisation du projet
+   - 1.1 Méthode de gestion (Agile/Scrum adapté)
+   - 1.2 Macro-planning (janvier → juin 2026)
+   - 1.3 Suivi des tâches (Trello)
+   - 1.4 Gestion du code source (Git)
+   - 1.5 CI/CD planifié
+2. Conception UI/UX
+   - 2.1 Sitemap
+   - 2.2 Zoning
+   - 2.3 Wireframes (basse fidélité)
+   - 2.4 Charte graphique
+   - 2.5 Maquettes graphiques (haute fidélité)
+   - 2.6 Considérations UX
 
 ---
 
@@ -130,7 +142,7 @@ Le sitemap ci-dessous présente l'ensemble des écrans de l'application BiblioTe
 - Zone détail : Détails du prêt sélectionné
 - Zone actions : Boutons "Créer un prêt" et "Rendre un prêt"
 
-*(Insérer ici le schéma de zoning – capture Figma)*
+![Zoning — Tableau de bord BiblioTech](screens/02-dashboard.png)
 
 ### 2.3 Wireframes (basse fidélité)
 
@@ -166,7 +178,15 @@ Le sitemap ci-dessous présente l'ensemble des écrans de l'application BiblioTe
 - Zone détail du prêt sélectionné (à droite du tableau)
 - 2 boutons sous le tableau : créer un prêt + rendre un prêt
 
-*(Insérer ici les wireframes – captures Figma)*
+![Écran — Connexion](screens/01-connexion.png)
+
+![Écran — Tableau de bord](screens/02-dashboard.png)
+
+![Écran — Catalogue](screens/03-catalogue.png)
+
+![Écran — Prêts / Retours](screens/04-prets.png)
+
+![Écran — Adhérents](screens/05-adherents.png)
 
 ### 2.4 Charte graphique
 
@@ -200,17 +220,23 @@ Le sitemap ci-dessous présente l'ensemble des écrans de l'application BiblioTe
 - Espacements généreux pour maximiser la lisibilité
 - Interface sobre et professionnelle, sans effets décoratifs superflus
 
-*(Insérer ici la planche de charte graphique – capture Figma)*
+![Interface BiblioTech — palette et typographie en action](screens/02-dashboard.png)
 
 ### 2.5 Maquettes graphiques (haute fidélité)
 
 #### Version Desktop – Tableau de bord
 
-*(Insérer ici la maquette haute fidélité desktop – capture Figma)*
+![Interface réelle — Tableau de bord (desktop)](screens/02-dashboard.png)
+
+![Interface réelle — Catalogue](screens/03-catalogue.png)
+
+![Interface réelle — Premier login (changement mot de passe)](screens/06-premier-login-mdp.png)
+
+![Interface réelle — Acceptation des CGU](screens/07-premier-login-cgu.png)
 
 #### Version Mobile – Liste du catalogue
 
-*(Insérer ici la maquette haute fidélité mobile – capture Figma)*
+![Interface réelle — Connexion (vue mobile)](screens/01-connexion.png)
 
 ### 2.6 Considérations UX
 

@@ -3,7 +3,7 @@ const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, HeadingLevel,
   BorderStyle, ShadingType, Table, TableRow, TableCell,
-  WidthType, AlignmentType, PageBreak,
+  WidthType, AlignmentType, PageBreak, ImageRun,
 } = require("docx");
 
 const outPath = path.join(__dirname, "dossier-projet-bibliotech-gregory-sergent.docx");
@@ -17,26 +17,26 @@ const jalons = [
   "JALON 6 - Gregory Sergent - LIVRABLE.md",
 ];
 
-function cleanText(text) {
-  return text.replace(/\*([^*]+)\*/g, '$1').replace(/_([^_]+)_/g, '$1');
-}
-
 function parseInline(rawText) {
-  const text = cleanText(rawText);
+  // Strip _italic_ (underscores) — must happen before asterisk processing
+  const text = rawText.replace(/_([^_]+)_/g, '$1');
   const parts = [];
-  const re = /\*\*(.+?)\*\*|`([^`]+)`/g;
+  // **bold** must come before *italic* in the alternation so ** is consumed first
+  const re = /\*\*(.+?)\*\*|\*([^*]+)\*|`([^`]+)`/g;
   let m, cursor = 0;
   while ((m = re.exec(text)) !== null) {
-    if (m.index > cursor) parts.push({ text: text.slice(cursor, m.index), bold: false, code: false });
-    if (m[1] !== undefined) parts.push({ text: m[1], bold: true, code: false });
-    else if (m[2] !== undefined) parts.push({ text: m[2], bold: false, code: true });
+    if (m.index > cursor) parts.push({ text: text.slice(cursor, m.index), bold: false, italic: false, code: false });
+    if (m[1] !== undefined)      parts.push({ text: m[1], bold: true,  italic: false, code: false });
+    else if (m[2] !== undefined) parts.push({ text: m[2], bold: false, italic: true,  code: false });
+    else if (m[3] !== undefined) parts.push({ text: m[3], bold: false, italic: false, code: true  });
     cursor = m.index + m[0].length;
   }
-  if (cursor < text.length) parts.push({ text: text.slice(cursor), bold: false, code: false });
-  if (parts.length === 0) parts.push({ text, bold: false, code: false });
+  if (cursor < text.length) parts.push({ text: text.slice(cursor), bold: false, italic: false, code: false });
+  if (parts.length === 0) parts.push({ text, bold: false, italic: false, code: false });
   return parts.map(p => new TextRun({
     text: p.text,
     bold: p.bold,
+    italics: p.italic,
     font: p.code ? "Courier New" : "Calibri",
     size: p.code ? 18 : undefined,
     color: p.code ? "2E4053" : undefined,
@@ -111,6 +111,15 @@ function parseMarkdownFile(filePath) {
     if (inCodeBlock) {
       codeLines.push(line);
       i++; continue;
+    }
+
+    // Skip "## Sommaire" section and its content until the next H1/H2 heading
+    if (/^## Sommaire\b/.test(line.trim())) {
+      i++;
+      while (i < lines.length && !/^#{1,2} /.test(lines[i])) {
+        i++;
+      }
+      continue;
     }
 
     if (/^\|/.test(line)) {
@@ -199,11 +208,28 @@ function parseMarkdownFile(filePath) {
 
     const imgMatch = line.match(/^!\[(.+?)\]\((.+?)\)/);
     if (imgMatch) {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: `[ Image : ${imgMatch[1]} ]`, italics: true, color: "888888", size: 20 })],
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 240, after: 240 },
-      }));
+      const imgRelPath = imgMatch[2];
+      const imgAbsPath = path.resolve(__dirname, imgRelPath);
+      if (fs.existsSync(imgAbsPath)) {
+        const imgBuffer = fs.readFileSync(imgAbsPath);
+        const ext = path.extname(imgAbsPath).toLowerCase().replace('.', '');
+        const typeMap = { png: 'png', jpg: 'jpg', jpeg: 'jpg', gif: 'gif' };
+        children.push(new Paragraph({
+          children: [new ImageRun({
+            data: imgBuffer,
+            transformation: { width: 600, height: Math.round(600 * 0.7) },
+            type: typeMap[ext] || 'png',
+          })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 240 },
+        }));
+      } else {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `[ Image : ${imgMatch[1]} ]`, italics: true, color: "888888", size: 20 })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 240 },
+        }));
+      }
       i++; continue;
     }
 
@@ -214,6 +240,75 @@ function parseMarkdownFile(filePath) {
     i++;
   }
 
+  return children;
+}
+
+// Extrait les titres H1/H2/H3 d'un fichier markdown (en sautant le Sommaire)
+function extractHeadings(filePath) {
+  const lines = fs.readFileSync(filePath, "utf8").replace(/^﻿/, "").split("\n");
+  const headings = [];
+  let inSommaire = false;
+  let inCode = false;
+  for (const line of lines) {
+    if (/^```/.test(line)) { inCode = !inCode; continue; }
+    if (inCode) continue;
+    if (/^## Sommaire\b/.test(line.trim())) { inSommaire = true; continue; }
+    if (inSommaire && /^#{1,2} /.test(line)) { inSommaire = false; }
+    if (inSommaire) continue;
+    const h1 = line.match(/^# (.+)/);
+    const h2 = line.match(/^## (.+)/);
+    const h3 = line.match(/^### (.+)/);
+    if (h1)      headings.push({ level: 1, text: h1[1].trim() });
+    else if (h2) headings.push({ level: 2, text: h2[1].trim() });
+    else if (h3) headings.push({ level: 3, text: h3[1].trim() });
+  }
+  return headings;
+}
+
+// Génère la page "Table des matières" à partir des titres de tous les jalons
+function buildToc(jalonFiles) {
+  const children = [
+    new Paragraph({
+      children: [new TextRun({ text: "Table des matières", bold: true, size: 36, color: "1F3864", font: "Calibri" })],
+      spacing: { before: 400, after: 240 },
+    }),
+    new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "2E4057" } },
+      spacing: { before: 0, after: 280 },
+      children: [],
+    }),
+  ];
+
+  for (const jalon of jalonFiles) {
+    const filePath = path.join(__dirname, jalon);
+    if (!fs.existsSync(filePath)) continue;
+    const headings = extractHeadings(filePath);
+    for (const h of headings) {
+      const indent = (h.level - 1) * 440;
+      children.push(new Paragraph({
+        children: [new TextRun({
+          text: h.text,
+          bold: h.level === 1,
+          size: h.level === 1 ? 24 : h.level === 2 ? 22 : 20,
+          color: h.level === 1 ? "1F3864" : h.level === 2 ? "2E4057" : "5D6D7E",
+          font: "Calibri",
+        })],
+        indent: { left: indent },
+        spacing: {
+          before: h.level === 1 ? 180 : h.level === 2 ? 80 : 40,
+          after: h.level === 1 ? 60 : 30,
+        },
+      }));
+    }
+    // Fine separator between jalons
+    children.push(new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 2, color: "DDDDDD" } },
+      spacing: { before: 80, after: 80 },
+      children: [],
+    }));
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }));
   return children;
 }
 
@@ -287,7 +382,7 @@ const coverChildren = [
 ];
 
 // Construire le contenu de tous les jalons
-const allChildren = [...coverChildren];
+const allChildren = [...coverChildren, ...buildToc(jalons)];
 
 for (let idx = 0; idx < jalons.length; idx++) {
   const jalon = jalons[idx];

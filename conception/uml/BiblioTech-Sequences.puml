@@ -25,15 +25,15 @@ participant "PretRepository" as REPO_PR
 database "PostgreSQL\n(Supabase)" as DB
 
 == Authentification préalable ==
-note over BIBLIO, FRONT: Bibliothécaire déjà connecté\nJWT valide en localStorage
+note over BIBLIO, FRONT: Bibliothécaire déjà connecté\nJWT valide (TTL 15 min)
 
 == Enregistrement du prêt ==
 
-BIBLIO -> FRONT : Saisit ISBN ou id_exemplaire\n+ id_adhérent + date_retour_prevue
-FRONT -> CTRL : POST /api/prets\nAuthorization: Bearer {JWT}\n{exemplaire_id, adherent_id, date_retour_prevue}
+BIBLIO -> FRONT : Saisit ISBN ou id_exemplaire\n+ id_adhérent
+FRONT -> CTRL : POST /api/prets\nAuthorization: Bearer {JWT}\n{exemplaire_id, adherent_id}
 
-CTRL -> CTRL : Valide le JWT\n(LexikJWT)
-CTRL -> SVC : enregistrerPret(dto)
+CTRL -> CTRL : Valide le JWT\n(LexikJWT RS256)
+CTRL -> SVC : create(exemplaire_id, adherent_id)
 
 group Vérification exemplaire
     SVC -> REPO_EX : findById(exemplaire_id)
@@ -42,31 +42,32 @@ group Vérification exemplaire
     REPO_EX --> SVC : Exemplaire
 
     alt Exemplaire non trouvé
-        SVC --> CTRL : ExemplaireNotFoundException
+        SVC --> CTRL : 404
         CTRL --> FRONT : 404 { message: "Exemplaire introuvable" }
         FRONT --> BIBLIO : Affiche erreur
-    else Statut ≠ "disponible"
-        SVC --> CTRL : ExemplaireIndisponibleException
+    else etat ≠ "DISPONIBLE"
+        SVC --> CTRL : 409
         CTRL --> FRONT : 409 { message: "Exemplaire non disponible" }
         FRONT --> BIBLIO : Affiche erreur
     end
 end
 
 group Création du prêt
-    SVC -> REPO_PR : create(Pret)
-    REPO_PR -> DB : INSERT INTO prets\n(exemplaire_id, adherent_id,\nbibliotheque_id, date_emprunt,\ndate_retour_prevue, statut)\nVALUES (...)
+    note over SVC : duree = bibliotheque.duree_pret (défaut : 21j)
+    SVC -> REPO_PR : save(Pret)
+    REPO_PR -> DB : INSERT INTO prets\n(exemplaire_id, adherent_id,\nbibliotheque_id, date_pret,\ndate_retour_prevue, etat_depart)\nVALUES (...)
     DB --> REPO_PR : Pret créé (id)
     REPO_PR --> SVC : Pret
 
-    SVC -> REPO_EX : updateStatut(exemplaire_id, "emprunte")
-    REPO_EX -> DB : UPDATE exemplaires\nSET statut = 'emprunte'\nWHERE id = ?
+    SVC -> REPO_EX : updateEtat(exemplaire_id, "EMPRUNTE")
+    REPO_EX -> DB : UPDATE exemplaires\nSET etat = 'EMPRUNTE'\nWHERE id = ?
     DB --> REPO_EX : OK
     REPO_EX --> SVC : OK
 end
 
-SVC --> CTRL : PretDTO (id, dates, statut)
+SVC --> CTRL : PretDTO (id, dates, etat_depart)
 CTRL --> FRONT : 201 Created\n{ pret: PretDTO }
-FRONT --> BIBLIO : Affiche confirmation\n"Prêt enregistré – retour prévu le JJ/MM/AAAA"
+FRONT --> BIBLIO : "Prêt enregistré – retour prévu le JJ/MM/AAAA"
 
 @enduml
 
@@ -111,7 +112,7 @@ REPO --> CTRL : null
 note over CTRL : Livre absent du catalogue\n→ appel API externe
 
 CTRL -> GBSVC : fetchByIsbn(isbn)
-GBSVC -> GBOOKS : GET https://www.googleapis.com\n/books/v1/volumes?q=isbn:{isbn}\n&key={API_KEY}
+GBSVC -> GBOOKS : GET googleapis.com/books/v1\n/volumes?q=isbn:{isbn}&key={API_KEY}
 
 alt Livre trouvé dans Google Books
     GBOOKS --> GBSVC : JSON { titre, auteur,\néditeur, annee, résumé,\ncouverture_url }
@@ -158,17 +159,18 @@ skinparam sequenceLifeLineBorderColor #AAAAAA
 skinparam noteBackgroundColor #FFFDE7
 skinparam noteBorderColor #F9A825
 
-title Diagramme de séquence – Connexion / Authentification JWT
+title Diagramme de séquence – Connexion / Authentification JWT + Refresh Token
 
 actor "Utilisateur" as USER
 participant "React\n(Frontend)" as FRONT
 participant "AuthController\n(Symfony)" as AUTH
 participant "UtilisateurRepository" as REPO
 participant "JWTManager\n(LexikJWT)" as JWT
+participant "RefreshTokenRepository" as REPO_RT
 database "PostgreSQL\n(Supabase)" as DB
 
 USER -> FRONT : Saisit email + mot de passe\nclique "Se connecter"
-FRONT -> AUTH : POST /api/login\n{ email, password }
+FRONT -> AUTH : POST /api/auth/login\n{ email, password }
 
 AUTH -> REPO : findByEmail(email)
 REPO -> DB : SELECT * FROM utilisateurs\nWHERE email = ?
@@ -178,37 +180,76 @@ REPO --> AUTH : Utilisateur
 alt Utilisateur introuvable
     AUTH --> FRONT : 401 { message: "Identifiants invalides" }
     FRONT --> USER : Affiche erreur
-else Mot de passe incorrect
-    AUTH -> AUTH : password_verify(password,\nhashed_password) → false
-    AUTH --> FRONT : 401 { message: "Identifiants invalides" }
-    FRONT --> USER : Affiche erreur
 else Compte désactivé (actif = false)
     AUTH --> FRONT : 403 { message: "Compte désactivé" }
     FRONT --> USER : Affiche erreur
+else Compte verrouillé (lockedUntil > now)
+    AUTH --> FRONT : 429 { message: "Compte verrouillé\nRéessayez dans X min" }
+    FRONT --> USER : Affiche erreur brute-force
+else Mot de passe incorrect
+    AUTH -> AUTH : Argon2id verify → false
+    AUTH -> REPO : incrementLoginAttempts(id)
+    note right : Si loginAttempts >= 5\nlockedUntil = now + 15 min
+    REPO -> DB : UPDATE utilisateurs\nSET login_attempts = ?,\nlocked_until = ?\nWHERE id = ?
+    DB --> REPO : OK
+    AUTH --> FRONT : 401 { message: "Identifiants invalides" }
+    FRONT --> USER : Affiche erreur
 else Authentification réussie
+    AUTH -> REPO : resetLoginAttempts(id)
+    REPO -> DB : UPDATE utilisateurs\nSET login_attempts = 0,\nlocked_until = NULL
+    DB --> REPO : OK
+
     AUTH -> JWT : createToken(Utilisateur)
-    note right of JWT : Payload JWT :\n{ sub: id, email,\nrole, bibliotheque_id,\nexp: now + 3600s }
-    JWT --> AUTH : token (JWT signé)
-    AUTH --> FRONT : 200 {\n  token: "eyJ...",\n  user: { id, nom, prenom,\n  email, role, bibliotheque_id }\n}
-    FRONT -> FRONT : Stocke JWT en localStorage\nStocke user dans contexte React
-    FRONT --> USER : Redirige vers dashboard\nselon rôle (admin / biblio / adhérent)
+    note right of JWT : Payload JWT :\n{ sub: id, email,\nrole, bibliotheque_id,\nexp: now + 900s (15 min) }
+    JWT --> AUTH : access_token (JWT RS256 4096-bit)
+
+    AUTH -> REPO_RT : createRefreshToken(utilisateur)
+    REPO_RT -> DB : INSERT INTO refresh_tokens\n(token, utilisateur_id,\nexpires_at = now + 30j)
+    DB --> REPO_RT : RefreshToken
+    REPO_RT --> AUTH : refresh_token (UUID)
+
+    AUTH --> FRONT : 200 {\n  access_token: "eyJ...",\n  refresh_token: "uuid...",\n  force_password_change: bool,\n  cgu_accepted: bool,\n  user: { id, nom, prenom,\n  email, role, bibliotheque_id }\n}
+
+    alt force_password_change = true
+        FRONT --> USER : Redirige vers\n/premier-login/mot-de-passe
+    else cgu_accepted = false
+        FRONT --> USER : Redirige vers\n/premier-login/cgu
+    else
+        FRONT -> FRONT : Stocke tokens\n(mémoire + httpOnly cookie)
+        FRONT --> USER : Redirige vers dashboard\nselon rôle
+    end
 end
 
-== Requête authentifiée ultérieure ==
+== Renouvellement silencieux (Refresh Token) ==
 
-USER -> FRONT : Navigue vers une page protégée
-FRONT -> AUTH : GET /api/exemplaires\nAuthorization: Bearer {JWT}
-AUTH -> JWT : verify(token)
+note over FRONT : access_token expiré ou proche expiration
+FRONT -> AUTH : POST /api/auth/refresh\n{ refresh_token: "uuid..." }
 
-alt Token expiré ou invalide
-    JWT --> AUTH : TokenExpiredException
-    AUTH --> FRONT : 401 { message: "Token expiré" }
+AUTH -> REPO_RT : findValidToken(token)
+REPO_RT -> DB : SELECT * FROM refresh_tokens\nWHERE token = ? AND\nrevoked_at IS NULL\nAND expires_at > now
+DB --> REPO_RT : RefreshToken (ou null)
+REPO_RT --> AUTH : RefreshToken
+
+alt Token invalide / expiré / révoqué
+    AUTH --> FRONT : 401 { message: "Session expirée" }
     FRONT --> USER : Redirige vers /login
-else Token valide
-    JWT --> AUTH : Payload décodé (role, bibliotheque_id)
-    AUTH -> AUTH : Vérifie les droits RBAC\n(role + bibliotheque_id)
-    AUTH --> FRONT : 200 { data: [...] }
-    FRONT --> USER : Affiche les données
+else Token valide (rotation)
+    AUTH -> REPO_RT : revoke(old_token)
+    AUTH -> REPO_RT : createRefreshToken(utilisateur)
+    AUTH -> JWT : createToken(Utilisateur)
+    AUTH --> FRONT : 200 {\n  access_token: "eyJ...",\n  refresh_token: "uuid_nouveau..."\n}
+    FRONT -> FRONT : Met à jour les tokens
 end
+
+== Déconnexion ==
+
+USER -> FRONT : Clique "Se déconnecter"
+FRONT -> AUTH : POST /api/auth/logout\nAuthorization: Bearer {JWT}
+AUTH -> REPO_RT : revokeByUser(utilisateur)
+REPO_RT -> DB : UPDATE refresh_tokens\nSET revoked_at = now\nWHERE utilisateur_id = ?
+DB --> REPO_RT : OK
+AUTH --> FRONT : 200 { message: "Déconnecté" }
+FRONT -> FRONT : Supprime les tokens
+FRONT --> USER : Redirige vers /login
 
 @enduml

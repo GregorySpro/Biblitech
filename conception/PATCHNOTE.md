@@ -233,7 +233,64 @@ Comptes de test créés :
 
 ## Points restants pour la soutenance (Jalon 6)
 
-- [ ] Pipeline GitHub Actions CI/CD (`.github/workflows/ci.yml`)
+- [x] Pipeline GitHub Actions CI/CD (`.github/workflows/ci.yml`) — **67/67 tests green**
 - [ ] Déploiement cloud avec variables d'environnement de production
 - [ ] Configurer `GOOGLE_BOOKS_API_KEY` en production
 - [ ] Tests E2E Playwright
+
+---
+
+# Patch Note — v1.2.0
+
+> Version du patch : **1.2.0**
+> Date d'application : 2026-09-18
+> Contexte : Correction pipeline CI/CD — 67/67 tests PHPUnit green
+
+---
+
+## Résumé
+
+Ce patch corrige 5 problèmes qui empêchaient les tests PHPUnit de passer en CI GitHub Actions.
+Résultat avant : 13 failures (UtilisateurControllerTest) + 5 failures (ExemplaireControllerTest) + 3 failures supplémentaires.
+Résultat après : **67/67 tests OK** — pipeline Backend PHPUnit + Frontend TypeScript : ✅ Success.
+
+---
+
+## Corrections
+
+### [FIX] bootstrap.php non chargé en CI — APP_SECRET absent
+
+- **Fichier :** `dev/backend/phpunit.xml.dist`
+- **Avant :** `bootstrap="vendor/autoload.php"` — `Dotenv::bootEnv()` jamais appelé, `APP_SECRET` non injecté → toutes les requêtes signées par Symfony échouaient
+- **Après :** `bootstrap="tests/bootstrap.php"` — `.env.test` correctement chargé avant les tests
+
+- **Fichier :** `dev/backend/.env.test`
+- **Ajout :** `APP_SECRET=test_secret_for_phpunit_do_not_use_in_prod`
+
+---
+
+### [FIX] Constante PHP manquante — ExemplaireController crash 500
+
+- **Fichier :** `dev/backend/src/Entity/Exemplaire.php`
+- **Avant :** `ExemplaireController` (lignes 113 et 155) référençait `Exemplaire::STATUT_INDISPONIBLE` mais la constante n'existait pas → PHP Fatal Error → HTTP 500 sur tout POST/PUT `/api/exemplaires`
+- **Après :** `public const STATUT_INDISPONIBLE = 'indisponible';` ajouté dans l'entité
+
+---
+
+### [FIX] Clés camelCase vs snake_case dans les assertions de tests
+
+Le sérialiseur Symfony est configuré avec `camel_case_to_snake_case` (`framework.yaml` ligne 6). Les tests assertaient des clés camelCase inexistantes dans les réponses JSON.
+
+| Fichier | Ligne | Avant | Après |
+|---|---|---|---|
+| `ExemplaireControllerTest.php` | 68 | `$data['codeExemplaire']` | `$data['code_exemplaire']` |
+| `ExemplaireControllerTest.php` | 121 | `assertArrayHasKey('codeExemplaire', ...)` | `assertArrayHasKey('code_exemplaire', ...)` |
+| `PretControllerTest.php` | 80 | `$data['dateRetourEffective']` | `$data['date_retour_effective']` |
+
+---
+
+### [FIX] CguController — délai de préavis CGU
+
+- **Fichier :** `dev/backend/src/Controller/CguController.php`
+- **Avant :** `$minDate = new \DateTimeImmutable('+14 days')` — calcul depuis l'heure exacte, incohérent avec le message d'erreur (15 jours)
+- **Après :** `$minDate = (new \DateTimeImmutable('today'))->modify('+15 days')` — ancré à minuit, conforme au message et à la règle métier

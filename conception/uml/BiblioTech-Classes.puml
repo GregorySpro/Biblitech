@@ -1,24 +1,122 @@
 @startuml BiblioTech-Classes
 !theme plain
-skinparam classBackgroundColor #EEF4FF
-skinparam classBorderColor #3B5998
-skinparam classArrowColor #555555
-skinparam shadowing false
-skinparam defaultFontName Calibri
-skinparam defaultFontSize 12
-skinparam packageBackgroundColor #F8F9FA
-skinparam packageBorderColor #AAAAAA
-skinparam stereotypeCBackgroundColor #FDEBD0
-skinparam linetype ortho
 
-title Diagramme de classes – BiblioTech (Architecture Symfony)
+' ── Palette ────────────────────────────────────────────────
+!define NAVY        #1E364A
+!define COBALT      #2E6DA4
+!define SKY         #4A90D9
+!define TEAL        #009BA5
+!define PAGE_BG     #F2F6FA
+!define PKG_BG      #E8EFF6
+!define PKG_BORDER  #B4CCE0
+!define ENTITY_BG   #FFFDF4
+!define ENTITY_BD   #C8A84B
+!define ENTITY_HD   #FDF0C0
+!define REPO_BG     #F4FBFF
+!define REPO_BD     #4A90D9
+!define REPO_HD     #CCE8FA
+!define SVC_BG      #F4FFF8
+!define SVC_BD      #27AE60
+!define SVC_HD      #C4F0D4
+!define CTRL_BG     #FFF4FB
+!define CTRL_BD     #C0399A
+!define CTRL_HD     #F4C8E8
+!define ARROW       #3D6080
+!define NOTE_BG     #FFFBEE
+!define NOTE_BD     #E09820
+!define TEXT_H      #FFFFFF
+
+' ── Globaux ────────────────────────────────────────────────
+skinparam backgroundColor PAGE_BG
+skinparam padding 6
+skinparam roundcorner 10
+skinparam shadowing true
+skinparam shadowingCornerRadius 4
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 11
+skinparam defaultTextAlignment left
+
+' ── Titre ──────────────────────────────────────────────────
+skinparam titleFontName "Segoe UI"
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam titleFontColor NAVY
+skinparam titleBackgroundColor #DEEAF4
+skinparam titleBorderColor COBALT
+skinparam titleBorderThickness 1.5
+skinparam titleBorderRoundCorner 6
+
+' ── Packages ───────────────────────────────────────────────
+skinparam packageBackgroundColor PKG_BG
+skinparam packageBorderColor PKG_BORDER
+skinparam packageBorderThickness 1.5
+skinparam packageFontName "Segoe UI"
+skinparam packageFontSize 12
+skinparam packageFontStyle bold
+skinparam packageFontColor COBALT
+
+' ── Classes (défaut) ───────────────────────────────────────
+skinparam classBackgroundColor #FFFFFF
+skinparam classBorderColor COBALT
+skinparam classBorderThickness 1.5
+skinparam classHeaderBackgroundColor COBALT
+skinparam classFontName "Segoe UI"
+skinparam classFontSize 11
+skinparam classFontStyle bold
+skinparam classFontColor TEXT_H
+skinparam classAttributeFontName "Segoe UI"
+skinparam classAttributeFontSize 10
+skinparam classAttributeFontColor #1A2733
+skinparam classStereotypeFontSize 9
+skinparam classStereotypeFontColor #DDEEFF
+
+' ── Classes par stéréotype ─────────────────────────────────
+skinparam classBackgroundColor<<Entity>>     ENTITY_BG
+skinparam classBorderColor<<Entity>>         ENTITY_BD
+skinparam classHeaderBackgroundColor<<Entity>> ENTITY_HD
+skinparam classFontColor<<Entity>>           NAVY
+
+skinparam classBackgroundColor<<Repository>> REPO_BG
+skinparam classBorderColor<<Repository>>     REPO_BD
+skinparam classHeaderBackgroundColor<<Repository>> REPO_HD
+skinparam classFontColor<<Repository>>       COBALT
+
+skinparam classBackgroundColor<<Service>>    SVC_BG
+skinparam classBorderColor<<Service>>        SVC_BD
+skinparam classHeaderBackgroundColor<<Service>> SVC_HD
+skinparam classFontColor<<Service>>          #1A6B3A
+
+skinparam classBackgroundColor<<Controller>> CTRL_BG
+skinparam classBorderColor<<Controller>>     CTRL_BD
+skinparam classHeaderBackgroundColor<<Controller>> CTRL_HD
+skinparam classFontColor<<Controller>>       #7A1060
+
+' ── Flèches ────────────────────────────────────────────────
+skinparam arrowColor ARROW
+skinparam arrowThickness 1.5
+
+' ── Notes ──────────────────────────────────────────────────
+skinparam noteBackgroundColor NOTE_BG
+skinparam noteBorderColor NOTE_BD
+skinparam noteBorderThickness 1
+skinparam noteFontName "Segoe UI"
+skinparam noteFontSize 10
+skinparam noteFontColor #5A4010
+
+' ── Stéréotypes (icônes) ───────────────────────────────────
+skinparam stereotypeCBackgroundColor ENTITY_HD
+skinparam stereotypeABackgroundColor CTRL_HD
+skinparam stereotypeIBackgroundColor REPO_HD
+skinparam stereotypeEBackgroundColor SVC_HD
+
+title Diagramme de classes – BiblioTech\n<size:11><color:#5A6B7A>Architecture Symfony 7 · PHP 8.3 · PostgreSQL 16 · Jalons 1–6</color></size>
 
 ' ═══════════════════════════════════════════════════════════
 ' PACKAGE : Entities (Doctrine ORM)
 ' ═══════════════════════════════════════════════════════════
-package "Entities" <<Rectangle>> {
+package "📦  Entities  (Doctrine ORM)" as PKG_ENT {
 
-    class Bibliotheque {
+    class Bibliotheque <<Entity>> {
         - id : int
         - nom : string
         - adresse : string
@@ -26,30 +124,39 @@ package "Entities" <<Rectangle>> {
         - telephone : ?string
         - dateInscription : DateTimeImmutable
         - actif : bool
-        --
+        - duree_pret : int = 21
+        ..
         + getId() : int
         + getNom() : string
         + isActif() : bool
+        + getDureePret() : int
     }
 
-    class Utilisateur {
+    class Utilisateur <<Entity>> {
         - id : int
         - nom : string
         - prenom : string
         - email : string
-        - motDePasse : string
-        - role : string
-        - dateInscription : DateTimeImmutable
+        - password : string  <i>Argon2id</i>
+        - roles : array
         - actif : bool
-        --
+        - forcePasswordChange : bool = true
+        - cguAccepted : bool = false
+        - cguAcceptedVersion : ?int
+        - loginAttempts : int = 0
+        - lockedUntil : ?DateTimeImmutable
+        - dateInscription : DateTimeImmutable
+        ..
         + getId() : int
         + getEmail() : string
-        + getRole() : string
-        + getBibliothequeId() : ?int
         + getRoles() : array
+        + getBibliotheque() : ?Bibliotheque
+        + isForcePasswordChange() : bool
+        + isCguAccepted() : bool
+        + isLocked() : bool
     }
 
-    class Livre {
+    class Livre <<Entity>> {
         - id : int
         - isbn : string
         - titre : string
@@ -60,42 +167,69 @@ package "Entities" <<Rectangle>> {
         - resume : ?string
         - couvertureUrl : ?string
         - dateAjout : DateTimeImmutable
-        --
+        ..
         + getId() : int
         + getIsbn() : string
         + getTitre() : string
     }
 
-    class Exemplaire {
+    class Exemplaire <<Entity>> {
         - id : int
-        - statut : string
+        - etat : string
+        <i>DISPONIBLE | EMPRUNTE | PERDU | DETERIORE</i>
+        - cote : ?string
         - dateAjout : DateTimeImmutable
-        - notes : ?string
-        --
+        ..
         + getId() : int
-        + getStatut() : string
+        + getEtat() : string
         + isDisponible() : bool
     }
 
-    class Pret {
+    class Pret <<Entity>> {
         - id : int
-        - dateEmprunt : DateTimeImmutable
+        - datePret : DateTimeImmutable
         - dateRetourPrevue : DateTimeImmutable
-        - dateRetourEffective : ?DateTimeImmutable
-        - statut : string
-        --
+        - dateRetourReel : ?DateTimeImmutable
+        - etatDepart : string = "BON"
+        - etatRetour : ?string
+        ..
         + getId() : int
-        + getStatut() : string
         + isEnRetard() : bool
+        + isClos() : bool
     }
 
-    class DemandeMigration {
+    class RefreshToken <<Entity>> {
+        - id : int
+        - token : string  <i>unique</i>
+        - expiresAt : DateTimeImmutable
+        - revokedAt : ?DateTimeImmutable
+        ..
+        + getId() : int
+        + isExpired() : bool
+        + isRevoked() : bool
+    }
+
+    class CguVersion <<Entity>> {
+        - id : int
+        - version : int
+        - contenu : text  <i>brut, séparateurs \\n</i>
+        - dateEffet : DateTimeImmutable
+        <i>contrainte : >= NOW() + 15j</i>
+        - createdAt : DateTimeImmutable
+        ..
+        + getId() : int
+        + getVersion() : int
+        + isActive() : bool
+    }
+
+    class DemandeMigration <<Entity>> {
         - id : int
         - statut : string
+        <i>EN_ATTENTE | APPROUVEE | REFUSEE</i>
         - dateDemande : DateTimeImmutable
         - dateTraitement : ?DateTimeImmutable
         - commentaire : ?string
-        --
+        ..
         + getId() : int
         + getStatut() : string
     }
@@ -104,136 +238,133 @@ package "Entities" <<Rectangle>> {
 ' ═══════════════════════════════════════════════════════════
 ' PACKAGE : Repositories
 ' ═══════════════════════════════════════════════════════════
-package "Repositories" <<Rectangle>> {
+package "🗄  Repositories" as PKG_REPO {
 
-    class BibliothequeRepository {
+    class BibliothequeRepository <<Repository>> {
         + findAllActives() : array
         + findById(id) : ?Bibliotheque
     }
 
-    class UtilisateurRepository {
+    class UtilisateurRepository <<Repository>> {
         + findByEmail(email) : ?Utilisateur
-        + findByBibliotheque(id) : array
+        + findByBibliotheque(?id) : array
         + findByRole(role) : array
     }
 
-    class LivreRepository {
+    class LivreRepository <<Repository>> {
         + findByIsbn(isbn) : ?Livre
-        + findByTitreOrAuteur(q) : array
+        + findByBibliothequeWithFilters(?bibId, q) : array
     }
 
-    class ExemplaireRepository {
-        + findByBibliotheque(id) : array
+    class ExemplaireRepository <<Repository>> {
+        + findByBibliotheque(?bibId) : array
         + findDisponiblesByLivre(livreId) : array
-        + updateStatut(id, statut) : void
     }
 
-    class PretRepository {
-        + findEnCoursByAdherent(adherentId) : array
-        + findEnRetard() : array
-        + findByBibliotheque(id) : array
+    class PretRepository <<Repository>> {
+        + findByBibliothequeWithFilters(?bibId) : array
+        + findRetardsByBibliotheque(?bibId) : array
     }
 
-    class DemandeMigrationRepository {
-        + findEnAttente() : array
+    class RefreshTokenRepository <<Repository>> {
+        + findValidToken(token) : ?RefreshToken
+        + revokeByUser(utilisateur) : void
+    }
+
+    class CguVersionRepository <<Repository>> {
+        + findCurrentVersion() : ?CguVersion
+        + findLatestPending() : ?CguVersion
+    }
+
+    class DemandeMigrationRepository <<Repository>> {
+        + findByBibliotheque(?bibId) : array
         + findByAdherent(adherentId) : array
     }
 }
 
 ' ═══════════════════════════════════════════════════════════
-' PACKAGE : Services (Logique métier)
+' PACKAGE : Services
 ' ═══════════════════════════════════════════════════════════
-package "Services" <<Rectangle>> {
+package "⚙  Services  (Logique métier)" as PKG_SVC {
 
-    class PretService {
-        - pretRepository : PretRepository
-        - exemplaireRepository : ExemplaireRepository
-        --
-        + enregistrerPret(dto : PretDTO) : Pret
-        + enregistrerRetour(pretId : int) : Pret
-        + listerEnRetard() : array
+    class PretService <<Service>> {
+        + create(exemplaire, utilisateur, duree) : Pret
+        + retour(pret, etatRetour) : Pret
+        + signalerPerdu(pret) : Pret
+        + isEnRetard(pret) : bool
     }
 
-    class LivreService {
-        - livreRepository : LivreRepository
-        - googleBooksService : GoogleBooksService
-        --
-        + creerLivre(dto : LivreDTO) : Livre
-        + rechercherParIsbn(isbn : string) : ?LivreDTO
-        + rechercherCatalogue(q : string) : array
-    }
-
-    class GoogleBooksService {
-        - apiKey : string
-        - httpClient : HttpClientInterface
-        --
-        + fetchByIsbn(isbn : string) : ?LivreMetadataDTO
-    }
-
-    class UtilisateurService {
-        - utilisateurRepository : UtilisateurRepository
-        - passwordHasher : UserPasswordHasherInterface
-        --
-        + creerCompte(dto : UtilisateurDTO) : Utilisateur
-        + desactiverCompte(id : int) : void
-        + changerMotDePasse(id : int, nouveau : string) : void
-    }
-
-    class MigrationService {
-        - migrationRepository : DemandeMigrationRepository
-        - utilisateurRepository : UtilisateurRepository
-        --
-        + soumettreDemande(dto : MigrationDTO) : DemandeMigration
-        + validerDemande(id : int) : DemandeMigration
-        + refuserDemande(id : int, commentaire : string) : DemandeMigration
+    class GoogleBooksService <<Service>> {
+        - API_URL : string
+        ..
+        + searchByIsbn(isbn) : ?array
     }
 }
 
 ' ═══════════════════════════════════════════════════════════
 ' PACKAGE : Controllers (API REST)
 ' ═══════════════════════════════════════════════════════════
-package "Controllers" <<Rectangle>> {
+package "🌐  Controllers  (API REST)" as PKG_CTRL {
 
-    class AuthController {
+    class AuthController <<Controller>> {
         + login(request) : JsonResponse
+        + refresh(request) : JsonResponse
         + logout(request) : JsonResponse
     }
 
-    class LivreController {
-        - livreService : LivreService
-        --
+    class CguController <<Controller>> {
+        + getCurrent() : JsonResponse
+        + accept(request) : JsonResponse
+        + publish(request) : JsonResponse  <i>super_admin</i>
+    }
+
+    class LivreController <<Controller>> {
         + index(request) : JsonResponse
-        + show(isbn) : JsonResponse
+        + searchIsbn(isbn) : JsonResponse
         + create(request) : JsonResponse
         + update(id, request) : JsonResponse
         + delete(id) : JsonResponse
     }
 
-    class PretController {
-        - pretService : PretService
-        --
+    class ExemplaireController <<Controller>> {
         + index(request) : JsonResponse
         + create(request) : JsonResponse
-        + retour(id) : JsonResponse
-        + enRetard() : JsonResponse
+        + update(id, request) : JsonResponse
+        + delete(id) : JsonResponse
     }
 
-    class UtilisateurController {
-        - utilisateurService : UtilisateurService
-        --
+    class PretController <<Controller>> {
+        + index(request) : JsonResponse
+        + create(request) : JsonResponse
+        + retour(id, request) : JsonResponse
+        + perdu(id) : JsonResponse
+    }
+
+    class UtilisateurController <<Controller>> {
         + index() : JsonResponse
         + create(request) : JsonResponse
         + update(id, request) : JsonResponse
-        + deactivate(id) : JsonResponse
+        + delete(id) : JsonResponse
+        + changePassword(request) : JsonResponse
+        + acceptCgu(request) : JsonResponse
     }
 
-    class MigrationController {
-        - migrationService : MigrationService
-        --
+    class BibliothequeController <<Controller>> {
+        + index() : JsonResponse
+        + show(id) : JsonResponse
+        + update(id, request) : JsonResponse
+    }
+
+    class DemandeMigrationController <<Controller>> {
+        + index() : JsonResponse
         + create(request) : JsonResponse
-        + valider(id) : JsonResponse
-        + refuser(id, request) : JsonResponse
-        + listEnAttente() : JsonResponse
+        + approve(id) : JsonResponse  <i>super_admin</i>
+        + reject(id) : JsonResponse   <i>super_admin</i>
+        + delete(id) : JsonResponse
+    }
+
+    class StatController <<Controller>> {
+        + index() : JsonResponse
     }
 }
 
@@ -241,45 +372,50 @@ package "Controllers" <<Rectangle>> {
 ' RELATIONS – Entités
 ' ═══════════════════════════════════════════════════════════
 
-Bibliotheque "1" o-- "0..*" Utilisateur       : emploie / accueille >
-Bibliotheque "1" o-- "0..*" Exemplaire         : possède >
-Livre        "1" o-- "0..*" Exemplaire         : est représenté par >
-Exemplaire   "1" o-- "0..*" Pret               : fait l'objet de >
-Utilisateur  "1" o-- "0..*" Pret               : effectue >
-Utilisateur  "1" o-- "0..*" DemandeMigration   : soumet >
-Bibliotheque "1" o-- "0..*" DemandeMigration   : reçoit (source) >
-Bibliotheque "1" o-- "0..*" DemandeMigration   : reçoit (cible) >
+Bibliotheque "1"    o-- "0..*" Utilisateur      : accueille >
+Bibliotheque "1"    o-- "0..*" Livre             : possède >
+Livre        "1"    o-- "0..*" Exemplaire        : représenté par >
+Exemplaire   "1"    o-- "0..*" Pret              : fait l'objet de >
+Utilisateur  "1"    o-- "0..*" Pret              : effectue >
+Utilisateur  "1"    o-- "0..*" RefreshToken      : possède >
+CguVersion   "0..1" o-- "0..*" Utilisateur       : acceptée par >
+Utilisateur  "1"    o-- "0..*" DemandeMigration  : soumet >
+Bibliotheque "1"    o-- "0..*" DemandeMigration  : source >
+Bibliotheque "1"    o-- "0..*" DemandeMigration  : cible >
 
-' ═══════════════════════════════════════════════════════════
-' RELATIONS – Repositories → Entities
-' ═══════════════════════════════════════════════════════════
+' ── Repositories → Entities ────────────────────────────────
+BibliothequeRepository      ..> Bibliotheque      : gère
+UtilisateurRepository       ..> Utilisateur       : gère
+LivreRepository             ..> Livre             : gère
+ExemplaireRepository        ..> Exemplaire        : gère
+PretRepository              ..> Pret              : gère
+RefreshTokenRepository      ..> RefreshToken      : gère
+CguVersionRepository        ..> CguVersion        : gère
+DemandeMigrationRepository  ..> DemandeMigration  : gère
 
-BibliothequeRepository     ..> Bibliotheque      : gère
-UtilisateurRepository      ..> Utilisateur       : gère
-LivreRepository            ..> Livre             : gère
-ExemplaireRepository       ..> Exemplaire        : gère
-PretRepository             ..> Pret              : gère
-DemandeMigrationRepository ..> DemandeMigration  : gère
-
-' ═══════════════════════════════════════════════════════════
-' RELATIONS – Services → Repositories
-' ═══════════════════════════════════════════════════════════
-
+' ── Services → Repositories ────────────────────────────────
 PretService      --> PretRepository
 PretService      --> ExemplaireRepository
-LivreService     --> LivreRepository
-LivreService     --> GoogleBooksService
-UtilisateurService --> UtilisateurRepository
-MigrationService --> DemandeMigrationRepository
-MigrationService --> UtilisateurRepository
+GoogleBooksService ..> LivreController : fournit métadonnées
 
-' ═══════════════════════════════════════════════════════════
-' RELATIONS – Controllers → Services
-' ═══════════════════════════════════════════════════════════
+' ── Controllers → Services/Repositories ────────────────────
+PretController             --> PretService
+LivreController            --> GoogleBooksService
+AuthController             --> RefreshTokenRepository
+CguController              --> CguVersionRepository
+DemandeMigrationController --> DemandeMigrationRepository
 
-LivreController      --> LivreService
-PretController       --> PretService
-UtilisateurController --> UtilisateurService
-MigrationController  --> MigrationService
+' ── Notes ──────────────────────────────────────────────────
+note bottom of UtilisateurController
+  <b>RBAC inline</b> : getRole() + getBibliothequeId()
+  Aucun AttributeVoter Symfony utilisé
+end note
+
+note bottom of AuthController
+  <b>JWT RS256 4096-bit</b> (LexikJWT)
+  TTL access_token : <b>15 min</b>
+  TTL refresh_token : <b>30 jours</b> (rotation)
+  Brute-force : lockout <b>15 min</b> après <b>5 échecs</b>
+end note
 
 @enduml

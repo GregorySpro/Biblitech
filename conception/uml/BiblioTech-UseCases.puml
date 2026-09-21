@@ -1,5 +1,6 @@
 @startuml BiblioTech-UseCases
 !theme plain
+scale 0.65
 skinparam actorStyle awesome
 skinparam packageStyle rectangle
 skinparam usecaseBackgroundColor #EEF4FF
@@ -11,7 +12,7 @@ skinparam shadowing false
 skinparam defaultFontName Calibri
 skinparam defaultFontSize 13
 
-title Diagramme de cas d'utilisation – BiblioTech
+title Diagramme de cas d'utilisation – BiblioTech (Jalons 1–6)
 
 ' ─── Acteurs ───────────────────────────────────────────────
 actor "Super Admin"     as SA #LightCoral
@@ -32,23 +33,25 @@ rectangle "BiblioTech" {
         usecase "Gérer tous les comptes\nutilisateurs"         as UC_USR_ALL
         usecase "Consulter les statistiques\nglobales"         as UC_STATS
         usecase "Activer / Désactiver\nune bibliothèque"       as UC_TOGGLE
+        usecase "Publier une nouvelle\nversion des CGU"        as UC_CGU_PUBLISH
+        usecase "Approuver / Refuser une\ndemande de migration" as UC_MIGR_VALID
     }
 
     ' === Admin =============================================
     package "Administration Bibliothèque" {
         usecase "Gérer les comptes\n(admin, biblio, adhérent)" as UC_USR
-        usecase "Valider / Refuser une\ndemande de migration"  as UC_MIGR_VALID
         usecase "Consulter les statistiques\nde la bibliothèque" as UC_STATS_LIB
-        usecase "Configurer la bibliothèque"                   as UC_CFG
+        usecase "Configurer la bibliothèque\n(duree_pret, email, etc.)" as UC_CFG
     }
 
     ' === Bibliothécaire ====================================
     package "Gestion Catalogue & Prêts" {
         usecase "Ajouter un livre\n(via ISBN / manuellement)"  as UC_LIVRE_ADD
         usecase "Modifier / Supprimer\nun livre"               as UC_LIVRE_EDIT
-        usecase "Gérer les exemplaires\n(statut, stock)"       as UC_EXEMP
+        usecase "Gérer les exemplaires\n(état, stock)"         as UC_EXEMP
         usecase "Enregistrer un prêt"                          as UC_PRET
-        usecase "Enregistrer un retour"                        as UC_RETOUR
+        usecase "Enregistrer un retour\n(+ état retour)"       as UC_RETOUR
+        usecase "Signaler un exemplaire\nperdu"                as UC_PERDU
         usecase "Consulter les prêts\nen retard"               as UC_RETARD
         usecase "Rechercher un livre\n/ un adhérent"           as UC_SEARCH
     }
@@ -59,16 +62,18 @@ rectangle "BiblioTech" {
     }
 
     ' === Adhérent ==========================================
-    package "Espace Adhérent (lecture seule)" {
+    package "Espace Adhérent" {
         usecase "Consulter le catalogue\nde sa bibliothèque"   as UC_CATAL
         usecase "Consulter ses prêts\nen cours & historique"   as UC_MY_PRETS
         usecase "Soumettre une demande\nde migration"          as UC_MIGR
     }
 
-    ' === Authentification (tous acteurs) ===================
-    package "Authentification" {
-        usecase "Se connecter\n(JWT)"                          as UC_LOGIN
+    ' === Authentification & Onboarding (tous acteurs) ======
+    package "Authentification & Onboarding" {
+        usecase "Se connecter\n(JWT RS256)"                    as UC_LOGIN
         usecase "Se déconnecter"                               as UC_LOGOUT
+        usecase "Changer le mot de passe\n(premier login)"     as UC_FIRST_PWD
+        usecase "Accepter les CGU\n(à chaque nouvelle version)" as UC_CGU_ACCEPT
     }
 }
 
@@ -79,21 +84,23 @@ SA --> UC_BIB
 SA --> UC_USR_ALL
 SA --> UC_STATS
 SA --> UC_TOGGLE
+SA --> UC_CGU_PUBLISH
+SA --> UC_MIGR_VALID
 SA --> UC_LOGIN
 SA --> UC_LOGOUT
 
-' Admin (en plus du super admin)
+' Admin (en plus du super admin hérité)
 AD --> UC_USR
-AD --> UC_MIGR_VALID
 AD --> UC_STATS_LIB
 AD --> UC_CFG
 
-' Bibliothécaire (en plus de l'admin)
+' Bibliothécaire (en plus de l'admin hérité)
 BI --> UC_LIVRE_ADD
 BI --> UC_LIVRE_EDIT
 BI --> UC_EXEMP
 BI --> UC_PRET
 BI --> UC_RETOUR
+BI --> UC_PERDU
 BI --> UC_RETARD
 BI --> UC_SEARCH
 
@@ -104,10 +111,19 @@ AH --> UC_MIGR
 AH --> UC_LOGIN
 AH --> UC_LOGOUT
 
+' Onboarding commun à tous (déclenché automatiquement si requis)
+SA --> UC_FIRST_PWD
+SA --> UC_CGU_ACCEPT
+AH --> UC_FIRST_PWD
+AH --> UC_CGU_ACCEPT
+
 ' ─── Relations include / extend ────────────────────────────
-UC_LIVRE_ADD ..> UC_GBOOKS : <<include>>
-UC_PRET       ..> UC_SEARCH : <<include>>
-UC_RETOUR     ..> UC_SEARCH : <<include>>
-UC_MIGR_VALID ..> UC_MIGR   : <<extend>>
+UC_LIVRE_ADD ..> UC_GBOOKS       : <<include>>
+UC_PRET       ..> UC_SEARCH      : <<include>>
+UC_RETOUR     ..> UC_SEARCH      : <<include>>
+UC_PERDU      ..> UC_RETOUR      : <<extend>>
+UC_LOGIN      ..> UC_FIRST_PWD   : <<extend>>\n[si force_password_change]
+UC_LOGIN      ..> UC_CGU_ACCEPT  : <<extend>>\n[si cgu_accepted = false]
+UC_MIGR_VALID ..> UC_MIGR        : <<extend>>
 
 @enduml

@@ -10,7 +10,37 @@
 
 ## Sommaire
 
-*(À générer dans Google Docs : **Insertion → Table des matières**)*
+1. Introduction
+2. Diagrammes de cas d'utilisation
+   - 2.1 Acteurs identifiés
+   - 2.2 Diagramme
+   - 2.3 Cas d'utilisation principaux
+3. Diagrammes de séquence
+   - 3.1 Enregistrer un prêt
+   - 3.2 Ajouter un livre via ISBN (Google Books API)
+   - 3.3 Connexion et authentification JWT
+4. Diagramme de classes
+   - 4.1 Vue d'ensemble
+   - 4.2 Correspondance Entities ↔ MPD (Jalon 3)
+   - 4.3 Principes appliqués
+5. Architecture multi-couches
+   - 5.1 Pattern MVC avec Symfony
+   - 5.2 Architecture n-tiers
+   - 5.3 Conteneurisation Docker
+   - 5.4 API externe – Google Books
+   - 5.5 Sécurité – Vue d'ensemble
+6. Endpoints de l'API REST
+   - 6.1 Authentification
+   - 6.2 Bibliothèques
+   - 6.3 Utilisateurs
+   - 6.4 Livres
+   - 6.5 Exemplaires
+   - 6.6 Prêts
+   - 6.7 Demandes de migration
+   - 6.8 Statistiques
+7. Stratégie de tests
+8. Gestion des erreurs API
+9. État d'avancement du développement
 
 ---
 
@@ -155,8 +185,8 @@ La logique métier est **entièrement encapsulée dans les Services**, les Contr
 
     ┌──────────────────────────────────────────┐
     │  TIER 1 – Client                         │
-    │  React 18 + Tailwind CSS                 │
-    │  Tauri (wrapper desktop natif)           │
+    │  React 19 + Vite + TypeScript            │
+    │  SPA web (déploiement Render)            │
     │  Appels HTTP/HTTPS vers l'API            │
     └────────────────┬─────────────────────────┘
                      │ HTTP/HTTPS (JWT Bearer)
@@ -174,7 +204,7 @@ La logique métier est **entièrement encapsulée dans les Services**, les Contr
     │  6 tables, clés étrangères, contraintes  │
     └──────────────────────────────────────────┘
 
-**Note Tauri :** BiblioTech est une application **desktop** (pas une webapp publique). Tauri encapsule le frontend React dans une fenêtre native (Rust). L'API Symfony est appelée en local ou déployée sur un serveur cloud — les deux modes sont supportés.
+**Note :** Le Jalon 1 envisageait Tauri pour une application desktop native. Ce choix a été abandonné au profit d'une SPA web React 19 déployée sur Render (voir note d'évolution architecturale dans le Jalon 5).
 
 ### 5.3 Conteneurisation Docker
 
