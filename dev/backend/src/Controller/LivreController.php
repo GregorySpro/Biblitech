@@ -102,9 +102,12 @@ class LivreController extends AbstractController
 
         $bibliothequeId = $user->getBibliothequeId();
 
+        // Normaliser l'ISBN : supprimer tirets et espaces (la colonne est VARCHAR(13))
+        $isbn = isset($data['isbn']) && $data['isbn'] !== '' ? preg_replace('/[-\s]/', '', $data['isbn']) : null;
+
         // Vérifier la duplication ISBN
-        if (!empty($data['isbn'])) {
-            $existing = $this->livreRepository->findByIsbnAndBibliotheque($data['isbn'], $bibliothequeId);
+        if ($isbn !== null) {
+            $existing = $this->livreRepository->findByIsbnAndBibliotheque($isbn, $bibliothequeId);
             if ($existing !== null) {
                 return $this->json(['status' => 409, 'code' => 'LIVRE_ISBN_DUPLICATE', 'message' => 'Un livre avec cet ISBN existe déjà dans votre catalogue.'], Response::HTTP_CONFLICT);
             }
@@ -115,7 +118,7 @@ class LivreController extends AbstractController
         $livre = new Livre();
         $livre->setTitre($data['titre']);
         $livre->setBibliotheque($bibliotheque);
-        $livre->setIsbn($data['isbn'] ?? null);
+        $livre->setIsbn($isbn);
         $livre->setAuteur($data['auteur'] ?? null);
         $livre->setEditeur($data['editeur'] ?? null);
         $livre->setAnneePublication($data['annee_publication'] ?? $data['anneePublication'] ?? null);

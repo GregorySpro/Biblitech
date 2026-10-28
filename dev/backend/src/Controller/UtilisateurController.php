@@ -111,6 +111,10 @@ class UtilisateurController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
+        if ($utilisateur->getId() === $user->getId()) {
+            return $this->json(['status' => 403, 'code' => 'CANNOT_SUSPEND_SELF', 'message' => 'Vous ne pouvez pas suspendre vos propres prêts.'], Response::HTTP_FORBIDDEN);
+        }
+
         $data    = json_decode($request->getContent(), true) ?? [];
         $suspendre = $data['suspendre'] ?? !$utilisateur->isPretsSuspendus();
 
@@ -276,6 +280,10 @@ class UtilisateurController extends AbstractController
         if ($user->getRole() === 'super_admin') {
             if (!in_array($roleCreation, ['admin', 'super_admin'], true)) {
                 return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut créer que des comptes admin ou super_admin. Les adhérents sont gérés par l\'admin de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+            }
+            // Un admin doit être rattaché à une bibliothèque
+            if ($roleCreation === 'admin' && empty($data['bibliotheque_id'])) {
+                return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Une bibliothèque doit être assignée à un compte administrateur.'], Response::HTTP_BAD_REQUEST);
             }
         }
 
