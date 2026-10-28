@@ -6,7 +6,9 @@ use App\Entity\Pret;
 use App\Exception\ExemplaireUnavailableException;
 use App\Exception\PretAlreadyReturnedException;
 use App\Exception\PretMaxReachedException;
+use App\Entity\DemandeMigration;
 use App\Repository\BibliothequeRepository;
+use App\Repository\DemandeMigrationRepository;
 use App\Repository\ExemplaireRepository;
 use App\Repository\PretRepository;
 use App\Repository\UtilisateurRepository;
@@ -26,6 +28,7 @@ class PretController extends AbstractController
         private readonly UtilisateurRepository $utilisateurRepository,
         private readonly ExemplaireRepository $exemplaireRepository,
         private readonly BibliothequeRepository $bibliothequeRepository,
+        private readonly DemandeMigrationRepository $demandeMigrationRepository,
         private readonly PretService $pretService,
         private readonly Security $security,
     ) {}
@@ -159,6 +162,19 @@ class PretController extends AbstractController
 
         if ($utilisateur === null) {
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'email ou utilisateur_id est obligatoire.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Garde-fou : bloquer si l'adhérent a une demande de migration en attente
+        $demandePending = $this->demandeMigrationRepository->findOneBy([
+            'utilisateur' => $utilisateur,
+            'statut' => DemandeMigration::STATUT_EN_ATTENTE,
+        ]);
+        if ($demandePending !== null) {
+            return $this->json([
+                'status'  => 403,
+                'code'    => 'MIGRATION_PENDING',
+                'message' => 'Impossible de créer un prêt : cet adhérent a une demande de migration en attente.',
+            ], Response::HTTP_FORBIDDEN);
         }
 
         // Vérifier la suspension de prêt

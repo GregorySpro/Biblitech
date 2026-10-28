@@ -39,7 +39,7 @@ class DemandeMigrationController extends AbstractController
         if ($user->getRole() === 'super_admin') {
             $demandes = $this->demandeMigrationRepository->findAll();
         } else if ($user->getRole() === 'admin') {
-            $demandes = $this->demandeMigrationRepository->findBy(['bibliothequeSource' => $user->getBibliothequeId()]);
+            $demandes = $this->demandeMigrationRepository->findBy(['bibliothequeCible' => $user->getBibliothequeId()]);
         } else {
             $demandes = $this->demandeMigrationRepository->findBy(['utilisateur' => $user->getId()]);
         }
@@ -71,13 +71,23 @@ class DemandeMigrationController extends AbstractController
     public function create(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
+
+        if ($user->getRole() !== 'adherent') {
+            return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Seuls les adhérents peuvent créer des demandes de migration.'], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
 
         if (empty($data['bibliotheque_cible_id'])) {
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Bibliothèque cible requise.'], Response::HTTP_BAD_REQUEST);
         }
 
-        $bibliothequeSource = $this->em->find(Bibliotheque::class, $user->getBibliothequeId());
+        $bibliothequeId = $user->getBibliothequeId();
+        if ($bibliothequeId === null) {
+            return $this->json(['status' => 400, 'code' => 'NO_SOURCE_BIBLIOTHEQUE', 'message' => 'Vous n\'êtes rattaché à aucune bibliothèque.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $bibliothequeSource = $this->em->find(Bibliotheque::class, $bibliothequeId);
         $bibliothequeCible = $this->em->find(Bibliotheque::class, $data['bibliotheque_cible_id']);
 
         if (!$bibliothequeCible) {
@@ -90,6 +100,12 @@ class DemandeMigrationController extends AbstractController
 
         if ($bibliothequeCible->getId() === $bibliothequeSource->getId()) {
             return $this->json(['status' => 400, 'code' => 'VALIDATION_ERROR', 'message' => 'Vous êtes déjà dans cette bibliothèque.'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Bloquer si l'adhérent a des prêts en cours
+        $pretsActifs = $this->pretRepository->findPretsActifsByUtilisateur($user);
+        if (count($pretsActifs) > 0) {
+            return $this->json(['status' => 400, 'code' => 'PRETS_EN_COURS', 'message' => 'Vous ne pouvez pas demander une migration car vous avez encore des prêts en cours.'], Response::HTTP_BAD_REQUEST);
         }
 
         // Check for pending demande

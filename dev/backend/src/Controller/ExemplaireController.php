@@ -110,7 +110,7 @@ class ExemplaireController extends AbstractController
             return $this->json(['status' => 409, 'code' => 'CODE_DUPLICATE', 'message' => 'Un exemplaire avec ce code existe déjà.'], Response::HTTP_CONFLICT);
         }
 
-        $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE];
+        $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE, Exemplaire::STATUT_HORS_SERVICE];
         $statut = $data['statut'] ?? Exemplaire::STATUT_DISPONIBLE;
         if (!in_array($statut, $allowedStatuts, true)) {
             return $this->json(['status' => 400, 'code' => 'INVALID_STATUT', 'message' => 'Statut invalide.'], Response::HTTP_BAD_REQUEST);
@@ -138,6 +138,10 @@ class ExemplaireController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
         }
 
+        if ($user->getRole() === 'super_admin') {
+            return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut pas modifier d\'exemplaires. Cette action appartient aux administrateurs et bibliothécaires de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+        }
+
         $exemplaire = $this->exemplaireRepository->find($id);
         if ($exemplaire === null) {
             return $this->json(['status' => 404, 'code' => 'EXEMPLAIRE_NOT_FOUND', 'message' => 'Exemplaire introuvable.'], Response::HTTP_NOT_FOUND);
@@ -152,7 +156,7 @@ class ExemplaireController extends AbstractController
         $data = json_decode($request->getContent(), true);
 
         if (array_key_exists('statut', $data)) {
-            $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE];
+            $allowedStatuts = [Exemplaire::STATUT_DISPONIBLE, Exemplaire::STATUT_EMPRUNTE, Exemplaire::STATUT_INDISPONIBLE, Exemplaire::STATUT_HORS_SERVICE];
             if (!in_array($data['statut'], $allowedStatuts, true)) {
                 return $this->json(['status' => 400, 'code' => 'INVALID_STATUT', 'message' => 'Statut invalide.'], Response::HTTP_BAD_REQUEST);
             }
@@ -206,6 +210,10 @@ class ExemplaireController extends AbstractController
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Seul un administrateur peut supprimer un exemplaire.'], Response::HTTP_FORBIDDEN);
         }
 
+        if ($user->getRole() === 'super_admin') {
+            return $this->json(['status' => 403, 'code' => 'SUPER_ADMIN_RESTRICTED', 'message' => 'Le super administrateur ne peut pas supprimer d\'exemplaires. Cette action appartient aux administrateurs de chaque bibliothèque.'], Response::HTTP_FORBIDDEN);
+        }
+
         $exemplaire = $this->exemplaireRepository->find($id);
         if ($exemplaire === null) {
             return $this->json(['status' => 404, 'code' => 'EXEMPLAIRE_NOT_FOUND', 'message' => 'Exemplaire introuvable.'], Response::HTTP_NOT_FOUND);
@@ -215,6 +223,12 @@ class ExemplaireController extends AbstractController
         $livre = $exemplaire->getLivre();
         if ($user->getRole() !== 'super_admin' && $livre->getBibliotheque()->getId() !== $user->getBibliothequeId()) {
             return $this->json(['status' => 403, 'code' => 'ACCESS_DENIED', 'message' => 'Accès refusé.'], Response::HTTP_FORBIDDEN);
+        }
+
+        // Garde-fou : interdire la suppression si un prêt actif existe sur cet exemplaire
+        $pretActif = $this->pretRepository->findActivePretByExemplaire($id);
+        if ($pretActif !== null) {
+            return $this->json(['status' => 409, 'code' => 'EXEMPLAIRE_HAS_ACTIVE_PRET', 'message' => 'Impossible de supprimer cet exemplaire : un prêt est actuellement en cours.'], Response::HTTP_CONFLICT);
         }
 
         $this->em->remove($exemplaire);
