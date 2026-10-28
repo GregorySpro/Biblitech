@@ -119,7 +119,8 @@ export function PretsPage() {
   const { user } = useAuth()
   const { withLoading } = useGlobalLoading()
   const isAdherent = user?.role === 'adherent'
-  const canManage  = !isAdherent && user?.role !== 'super_admin'
+  const canManage       = !isAdherent && user?.role !== 'super_admin'
+  const canDeclarePerdu = !isAdherent
 
   // ── Nouveau prêt : états du formulaire intelligent ──────
   const [isbnQuery, setIsbnQuery]         = useState('')
@@ -411,15 +412,17 @@ export function PretsPage() {
                     <ArrowUturnLeftIcon className="w-4 h-4" />
                     Enregistrer le retour
                   </button>
-                  <button
-                    disabled={!selected || selected.statut !== 'en_cours' && selected.statut !== 'en_retard'}
-                    onClick={handleDeclarePerdu}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-white text-sm font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <NoSymbolIcon className="w-4 h-4" />
-                    {declaringPerdu ? '…' : 'Déclarer perdu'}
-                  </button>
                 </>
+              )}
+              {canDeclarePerdu && (
+                <button
+                  disabled={!selected || selected.statut !== 'en_cours' && selected.statut !== 'en_retard'}
+                  onClick={handleDeclarePerdu}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-white text-sm font-medium text-red-600 hover:bg-red-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <NoSymbolIcon className="w-4 h-4" />
+                  {declaringPerdu ? '…' : 'Déclarer perdu'}
+                </button>
               )}
             </div>
           </div>

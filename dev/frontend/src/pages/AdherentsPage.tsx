@@ -159,6 +159,10 @@ export function AdherentsPage() {
       errors.push(errorMessages.password)
     }
 
+    if (!isEditing && isSuperAdmin && formData.role !== 'super_admin' && !formData.bibliotheque_id) {
+      errors.push('Une bibliothèque doit être assignée pour ce rôle')
+    }
+
     if (errors.length > 0) {
       setFormError(errors.join(' • '))
       return
@@ -359,7 +363,7 @@ export function AdherentsPage() {
                   </div>
 
                   {/* Bouton suspension */}
-                  {(isAdmin || isSuperAdmin) && (
+                  {(isAdmin || isSuperAdmin) && selected.id !== user?.sub && (
                     <button
                       onClick={handleToggleSuspension}
                       style={{ cursor: 'pointer' }}
@@ -462,7 +466,7 @@ export function AdherentsPage() {
                 <PencilSquareIcon className="w-4 h-4" />
                 Modifier
               </button>
-              {(isAdmin || isSuperAdmin) && (
+              {(isAdmin || isSuperAdmin) && selected.id !== user?.sub && (
                 <button
                   onClick={handleToggleSuspension}
                   style={{ cursor: 'pointer' }}
@@ -628,7 +632,7 @@ export function AdherentsPage() {
                 {/* Bibliothèque (super_admin uniquement) */}
                 {isSuperAdmin && (
                   <div>
-                    <label className="block text-sm font-medium text-[#374151] mb-1">Bibliothèque associée</label>
+                    <label className="block text-sm font-medium text-[#374151] mb-1">Bibliothèque associée{!isEditing && formData.role !== 'super_admin' ? ' *' : ''}</label>
                     <select
                       value={formData.bibliotheque_id ?? ''}
                       onChange={e => setFormData({ ...formData, bibliotheque_id: e.target.value ? Number(e.target.value) : null })}

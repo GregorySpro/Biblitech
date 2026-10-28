@@ -19,7 +19,7 @@ export function MonComptePage() {
   const { user, manualRefresh, logout } = useAuth()
   const { reload: reloadCgu } = useCgu()
 
-  const [nom, setNom]       = useState(user?.email?.split('@')[0] ?? '')
+  const [nom, setNom]       = useState('')
   const [prenom, setPrenom] = useState('')
   const [email, setEmail]   = useState(user?.email ?? '')
 
@@ -44,6 +44,15 @@ export function MonComptePage() {
   const [cguLoading, setCguLoading]         = useState(false)
 
   const isSuperAdmin = user?.role === 'super_admin'
+
+  useEffect(() => {
+    utilisateurService.getMe()
+      .then(u => {
+        setNom(prev => prev !== '' ? prev : (u.nom ?? ''))
+        setPrenom(prev => prev !== '' ? prev : (u.prenom ?? ''))
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!isSuperAdmin) return

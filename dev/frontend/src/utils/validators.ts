@@ -44,7 +44,7 @@ export const validators = {
    * Validate name (at least 2 characters, allows letters, spaces, hyphens, apostrophes, dots, digits)
    */
   isValidName: (name: string): boolean => {
-    return /^[a-zA-ZÀ-ÿ0-9\s\-'.,]{2,200}$/.test(name.trim())
+    return /^[a-zA-ZÀ-ÿ0-9\s\-'.,&()/+:;]{2,200}$/.test(name.trim())
   },
 
   /**

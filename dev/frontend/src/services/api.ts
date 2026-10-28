@@ -93,6 +93,15 @@ api.interceptors.response.use(
       }
     }
 
+    // Extraire le message métier du backend si disponible
+    const backendMessage = error.response?.data?.message
+    if (backendMessage) {
+      const enriched = new Error(backendMessage) as Error & { code?: string; httpStatus?: number }
+      enriched.code = error.response?.data?.code
+      enriched.httpStatus = error.response?.status
+      return Promise.reject(enriched)
+    }
+
     return Promise.reject(error)
   }
 )

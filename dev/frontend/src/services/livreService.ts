@@ -87,6 +87,9 @@ export const livreService = {
       if (status === 409 || code === 'LIVRE_ISBN_DUPLICATE') {
         throw new Error('Un livre avec cet ISBN existe déjà dans votre catalogue.')
       }
+      if (status === 403) {
+        throw new Error(err?.response?.data?.message ?? 'Vous n\'avez pas les droits pour ajouter un livre.')
+      }
       if (status === 400) {
         throw new Error(err?.response?.data?.message ?? 'Données invalides.')
       }

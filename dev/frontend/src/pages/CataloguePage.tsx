@@ -92,9 +92,13 @@ export function CataloguePage() {
         annee_publication: meta.anneePublication ?? new Date().getFullYear(),
         description: meta.description ?? '',
       })
+      setIsbnSearch('')
+      if (!canEdit) {
+        setIsbnError(`Livre trouvé : « ${meta.titre} » (${meta.auteur ?? 'auteur inconnu'}). Vous n'avez pas les droits pour l'ajouter.`)
+        return
+      }
       setIsEditing(false)
       setShowFormModal(true)
-      setIsbnSearch('')
     } catch (err) {
       setIsbnError(err instanceof Error ? err.message : 'ISBN non trouvé')
     }
