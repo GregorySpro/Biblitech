@@ -72,7 +72,7 @@ export function AdherentsPage() {
     nom: '',
     prenom: '',
     email: '',
-    role: 'adherent' as const,
+    role: 'adherent' as string,
     mot_de_passe: '',
     bibliotheque_id: null as number | null,
   })
