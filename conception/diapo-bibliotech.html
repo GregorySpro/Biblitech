@@ -1494,28 +1494,44 @@ password_hashers:
   </div>
 
   <!-- ════════════════════════════════════════════════════════
-       SLIDE 11 — API EXTERNE : MIGRATION GOOGLE BOOKS → OPEN LIBRARY
+       SLIDE 11 — API EXTERNE : OPEN LIBRARY
   ════════════════════════════════════════════════════════ -->
   <div class="slide">
-    <div class="eyebrow">API externe · Décision prise en phase de déploiement</div>
-    <div class="slide-title">Migration Google Books → Open Library</div>
+    <div class="eyebrow">API externe</div>
+    <div class="slide-title">Open Library — Recherche ISBN</div>
     <div class="sep"></div>
     <div class="cols-2">
       <div style="display:flex;flex-direction:column;gap:14px;">
-        <div class="card" style="border-color:rgba(239,68,68,.4);">
-          <div class="card-title" style="color:var(--danger);">Google Books API — Abandonnée</div>
-          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
-            Problème découvert en production : le qualificatif <code style="color:var(--warn);">isbn:</code> retourne systématiquement <strong style="color:var(--danger);">totalItems: 0</strong> pour tous les ISBNs, y compris des livres très connus.
-          </div>
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title" style="color:var(--accent3);">Pourquoi Open Library ?</div>
           <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
-            <div class="tag red"><code>isbn:9782070360024</code> → 0 résultat</div>
-            <div class="tag red"><code>isbn:9780141439518</code> → 0 résultat</div>
-            <div class="tag yellow">Titre seul → 338 résultats ✓ (clé valide)</div>
-            <div class="tag">Diagnostic : limitation non documentée de l'API</div>
+            <div class="tag green">Gratuite — aucune clé API requise</div>
+            <div class="tag green">Catalogue mondial 37 M+ livres</div>
+            <div class="tag green">ISBN-13 et ISBN-10 supportés</div>
+            <div class="tag green">Couvertures via covers.openlibrary.org</div>
+            <div class="tag green">Pas de quota, pas de 429</div>
+            <div class="tag green">Données structurées : auteurs, éditeur, année</div>
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Flux (inchangé côté bibliothécaire)</div>
+          <div class="card-title">Endpoint</div>
+          <div class="code" style="margin-top:10px;font-size:11px;">
+GET https://openlibrary.org/api/books
+  ?bibkeys=<span class="str">ISBN:9782070360024</span>
+  &amp;format=<span class="str">json</span>
+  &amp;jscmd=<span class="str">details</span>
+
+<span class="cm">// Réponse :</span>
+{ <span class="str">"ISBN:9782070360024"</span>: {
+    <span class="str">"details"</span>: { <span class="str">"title"</span>: <span class="str">"..."</span>, <span class="str">"authors"</span>: [...] },
+    <span class="str">"thumbnail_url"</span>: <span class="str">"https://..."</span>
+}}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Flux bibliothécaire</div>
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;font-size:13px;color:var(--dimmed);">
             <div style="display:flex;gap:10px;align-items:flex-start;">
               <span style="color:var(--accent);font-weight:700;min-width:20px;">1.</span>
@@ -1527,47 +1543,27 @@ password_hashers:
             </div>
             <div style="display:flex;gap:10px;align-items:flex-start;">
               <span style="color:var(--accent);font-weight:700;min-width:20px;">3.</span>
-              Pré-remplissage : titre, auteur, éditeur, année, couverture
+              Pré-remplissage automatique : titre, auteur, éditeur, année, couverture
             </div>
             <div style="display:flex;gap:10px;align-items:flex-start;">
-              <span style="color:var(--accent3);font-weight:700;min-width:20px;">↳</span>
-              ISBN introuvable → formulaire vide pré-rempli avec l'ISBN
+              <span style="color:var(--accent3);font-weight:700;min-width:20px;">4.</span>
+              <strong style="color:var(--text);">Validation</strong>, puis création dans le catalogue
             </div>
           </div>
         </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px;">
-        <div class="card" style="border-color:rgba(16,185,129,.4);">
-          <div class="card-title" style="color:var(--accent3);">Open Library API — Retenue</div>
-          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
-            <div class="tag green">Gratuite, sans clé API</div>
-            <div class="tag green">Catalogue mondial 37 M+ livres</div>
-            <div class="tag green">ISBN-13 et ISBN-10 supportés</div>
-            <div class="tag green">Couvertures via covers.openlibrary.org</div>
-            <div class="tag green">Pas de quota, pas de 429</div>
+        <div class="card">
+          <div class="card-title">ISBN introuvable</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Si l'ISBN n'est pas dans Open Library, le formulaire s'ouvre <strong style="color:var(--text);">pré-rempli avec l'ISBN</strong>. Le bibliothécaire complète manuellement les métadonnées — aucun blocage.
+          </div>
+          <div style="margin-top:8px;">
+            <span class="tag yellow">⚠ Livre non trouvé dans Open Library — compléter manuellement</span>
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Implémentation</div>
-          <div class="code" style="margin-top:10px;font-size:11px;">
-<span class="cm">// OpenLibraryService.php</span>
-<span class="kw">const</span> API_URL = <span class="str">'https://openlibrary.org/api/books'</span>;
-
-$response = $this->client->request(<span class="str">'GET'</span>, self::API_URL, [
-    <span class="str">'query'</span> => [
-        <span class="str">'bibkeys'</span> => <span class="str">'ISBN:'</span> . $isbn,
-        <span class="str">'format'</span>  => <span class="str">'json'</span>,
-        <span class="str">'jscmd'</span>   => <span class="str">'details'</span>,
-    ],
-    <span class="str">'timeout'</span> => <span class="num">5.0</span>,
-]);
-<span class="cm">// Réponse : { "ISBN:xxx": { details: {...} } }</span>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-title">Impact sur le projet</div>
+          <div class="card-title">Architecture service</div>
           <div style="font-size:13px;color:var(--dimmed);margin-top:6px;line-height:1.7;">
-            Seule la couche service a changé. Les interfaces (Controller, frontend) sont <strong style="color:var(--text);">inchangées</strong>. La variable d'environnement <code>GOOGLE_BOOKS_API_KEY</code> n'est plus nécessaire.
+            <code>OpenLibraryService</code> injecté dans <code>LivreController</code> via autowiring Symfony. Aucune clé dans <code>services.yaml</code>, aucune variable d'environnement.
           </div>
         </div>
       </div>
@@ -1594,7 +1590,7 @@ $response = $this->client->request(<span class="str">'GET'</span>, self::API_URL
               <tr><td>LivreControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>Catalogue, recherche ISBN</td></tr>
               <tr><td>PretControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>Création, retour, retards</td></tr>
               <tr><td>PretServiceTest</td><td><span class="tag purple" style="font-size:11px;padding:2px 8px;">Unit</span></td><td>Logique métier prêts</td></tr>
-              <tr><td>GoogleBooksServiceTest</td><td><span class="tag purple" style="font-size:11px;padding:2px 8px;">Unit</span></td><td>API externe, timeouts</td></tr>
+              <tr><td>OpenLibraryServiceTest</td><td><span class="tag purple" style="font-size:11px;padding:2px 8px;">Unit</span></td><td>API externe, timeouts</td></tr>
             </tbody>
           </table>
         </div>
@@ -1803,7 +1799,7 @@ $user->setActive(<span class="kw">false</span>);
             <div style="font-size:14px;font-weight:600;">Déploiement cloud activé</div>
             <span class="tag green" style="font-size:11px;">Fait ✓</span>
           </div>
-          <div style="font-size:12px;color:var(--dimmed);">Backend sur Render · BDD Supabase · tag v1.0.0 en production</div>
+          <div style="font-size:12px;color:var(--dimmed);">Frontend Static Site · Backend Docker · BDD Supabase · tag v1.0.0</div></div>
         </div>
         <div class="card" style="border-color:rgba(16,185,129,.3);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
@@ -1837,7 +1833,7 @@ $user->setActive(<span class="kw">false</span>);
           <tr><td>Backend Symfony PHP (LTS récent)</td><td>Symfony 7.3 · PHP ≥ 8.3</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
           <tr><td>Frontend SPA React ou Angular</td><td>React 19 · Vite 8 · TypeScript</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
           <tr><td>Base de données relationnelle</td><td>PostgreSQL 16 · Doctrine ORM</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
-          <tr><td>API externe intégrée</td><td>Google Books API (ISBN)</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>API externe intégrée</td><td>Open Library API (ISBN, sans clé)</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
           <tr><td>Docker + Docker Compose</td><td>3 services · Dockerfiles frontend + backend</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
           <tr><td>Git avec branches</td><td>main / develop / feat/* · PRs</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
           <tr><td>CI, tests sur chaque push</td><td>GitHub Actions · backend + frontend</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
