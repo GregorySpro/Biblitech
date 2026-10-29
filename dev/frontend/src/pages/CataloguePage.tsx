@@ -71,7 +71,7 @@ export function CataloguePage() {
   const { data: livresData, loading, error, refetch } = useApiCall(() => livreService.getAll())
   const livres = livresData ?? []
 
-  // Handle ISBN search — pre-fills the add-book form with Google Books metadata
+  // Handle ISBN search — pre-fills the add-book form with Open Library metadata
   const handleIsbnSearch = async () => {
     if (!isbnSearch.trim()) {
       setIsbnError('Veuillez entrer un ISBN')
@@ -103,7 +103,7 @@ export function CataloguePage() {
       const code = (err as any).code
       if (code === 'LIVRE_ISBN_NOT_FOUND_GOOGLE') {
         if (!canEdit) {
-          setIsbnError('Livre non trouvé dans Google Books.')
+          setIsbnError('Livre non trouvé dans Open Library.')
           return
         }
         setFormData({
@@ -117,7 +117,7 @@ export function CataloguePage() {
         setIsbnSearch('')
         setIsEditing(false)
         setShowFormModal(true)
-        setIsbnError('Livre non trouvé dans Google Books — ISBN pré-rempli, complétez les informations manuellement.')
+        setIsbnError('Livre non trouvé dans Open Library — ISBN pré-rempli, complétez les informations manuellement.')
       } else {
         setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la recherche ISBN')
       }
@@ -332,7 +332,7 @@ export function CataloguePage() {
             onSearch={setSearch}
             className="flex-1"
           />
-          {/* Recherche ISBN via Google Books */}
+          {/* Recherche ISBN via Open Library */}
           <div className="flex gap-2">
             <div className="relative">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CA3AF] pointer-events-none" />
@@ -340,7 +340,7 @@ export function CataloguePage() {
                 type="text"
                 value={isbnSearch}
                 onChange={e => setIsbnSearch(e.target.value)}
-                placeholder="ISBN (Google Books)"
+                placeholder="ISBN (Open Library)"
                 style={{ fontFamily: 'var(--font-mono)' }}
                 className="pl-9 pr-4 py-2.5 w-52 rounded-xl border border-[#E5E7EB] bg-white text-sm text-[#374151] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#1E3A8A]/20 focus:border-[#1E3A8A] transition-all duration-200 shadow-sm"
               />
