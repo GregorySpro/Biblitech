@@ -32,10 +32,8 @@ class GoogleBooksService
         try {
             $response = $this->httpClient->request('GET', self::API_URL, [
                 'query' => [
-                    'q'            => 'isbn:' . $isbn,
-                    'key'          => $this->apiKey,
-                    'langRestrict' => 'fr',
-                    'country'      => 'FR',
+                    'q'   => 'isbn:' . $isbn,
+                    'key' => $this->apiKey,
                 ],
                 'timeout' => 5.0,
             ]);
