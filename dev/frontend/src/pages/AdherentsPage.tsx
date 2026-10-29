@@ -363,7 +363,7 @@ export function AdherentsPage() {
                   </div>
 
                   {/* Bouton suspension */}
-                  {(isAdmin || isSuperAdmin) && selected.id !== user?.sub && (
+                  {(isAdmin || isSuperAdmin) && Number(selected.id) !== Number(user?.sub) && (
                     <button
                       onClick={handleToggleSuspension}
                       style={{ cursor: 'pointer' }}
@@ -466,7 +466,7 @@ export function AdherentsPage() {
                 <PencilSquareIcon className="w-4 h-4" />
                 Modifier
               </button>
-              {(isAdmin || isSuperAdmin) && selected.id !== user?.sub && (
+              {(isAdmin || isSuperAdmin) && Number(selected.id) !== Number(user?.sub) && (
                 <button
                   onClick={handleToggleSuspension}
                   style={{ cursor: 'pointer' }}
