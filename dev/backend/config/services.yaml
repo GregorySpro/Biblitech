@@ -13,7 +13,4 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Injection de la clé API Google Books dans le service
-    App\Service\GoogleBooksService:
-        arguments:
-            $apiKey: '%env(GOOGLE_BOOKS_API_KEY)%'
+    # Open Library ne nécessite pas de clé API — autowire suffit

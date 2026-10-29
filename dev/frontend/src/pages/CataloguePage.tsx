@@ -100,7 +100,27 @@ export function CataloguePage() {
       setIsEditing(false)
       setShowFormModal(true)
     } catch (err) {
-      setIsbnError(err instanceof Error ? err.message : 'ISBN non trouvé')
+      const code = (err as any).code
+      if (code === 'LIVRE_ISBN_NOT_FOUND_GOOGLE') {
+        if (!canEdit) {
+          setIsbnError('Livre non trouvé dans Google Books.')
+          return
+        }
+        setFormData({
+          isbn: isbnSearch.trim(),
+          titre: '',
+          auteur: '',
+          editeur: '',
+          annee_publication: new Date().getFullYear(),
+          description: '',
+        })
+        setIsbnSearch('')
+        setIsEditing(false)
+        setShowFormModal(true)
+        setIsbnError('Livre non trouvé dans Google Books — ISBN pré-rempli, complétez les informations manuellement.')
+      } else {
+        setIsbnError(err instanceof Error ? err.message : 'Erreur lors de la recherche ISBN')
+      }
     }
   }
 

@@ -7,7 +7,7 @@ use App\Entity\Livre;
 use App\Exception\GoogleBooksApiException;
 use App\Exception\IsbnNotFoundException;
 use App\Repository\LivreRepository;
-use App\Service\GoogleBooksService;
+use App\Service\OpenLibraryService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -23,7 +23,7 @@ class LivreController extends AbstractController
     public function __construct(
         private readonly LivreRepository $livreRepository,
         private readonly EntityManagerInterface $em,
-        private readonly GoogleBooksService $googleBooksService,
+        private readonly OpenLibraryService $openLibraryService,
         private readonly Security $security,
     ) {}
 
@@ -54,7 +54,7 @@ class LivreController extends AbstractController
         }
 
         try {
-            $metadonnees = $this->googleBooksService->rechercherParIsbn($isbn);
+            $metadonnees = $this->openLibraryService->rechercherParIsbn($isbn);
             return $this->json($metadonnees, Response::HTTP_OK);
         } catch (IsbnNotFoundException $e) {
             return $this->json(['status' => 404, 'code' => 'LIVRE_ISBN_NOT_FOUND_GOOGLE', 'message' => $e->getMessage()], Response::HTTP_NOT_FOUND);

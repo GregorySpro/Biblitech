@@ -1,0 +1,2047 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<!DOCTYPE html>
+<title>BiblioTech — Soutenance CDA v5</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #07111F;
+    --surface: #0C1828;
+    --card:    #101E2E;
+    --border:  #1A2D42;
+    --accent:  #3B82F6;
+    --accent2: #7C3AED;
+    --accent3: #10B981;
+    --warn:    #F59E0B;
+    --danger:  #EF4444;
+    --text:    #D4E2F0;
+    --muted:   #466082;
+    --dimmed:  #7898B8;
+    --tag-bg:  #0E1E30;
+    --tag-text:#5598E8;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+
+  /* ── SLIDE ENGINE ───────────────────────────────────── */
+  .deck { width: 100vw; height: calc(100vh - 68px); position: relative; overflow: hidden; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    padding: 36px 56px 20px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(60px);
+    transition: opacity .35s ease, transform .35s ease;
+    will-change: transform, opacity;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translateX(0);
+  }
+
+  /* ── NAV ────────────────────────────────────────────── */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0; height: 68px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--dimmed);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 5px 16px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-weight: 500;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .nav button:hover { color: var(--text); border-color: var(--accent); background: rgba(59,130,246,.07); }
+  .nav button:disabled { color: var(--border); border-color: var(--border); cursor: default; background: none; }
+  .counter {
+    font-size: 11px; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 52px; text-align: center;
+    letter-spacing: .08em;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── PROGRESS BAR ───────────────────────────────────── */
+  .progress-bar {
+    position: fixed; top: 0; left: 0; height: 2px;
+    background: var(--accent);
+    transition: width .3s ease;
+    z-index: 100;
+  }
+
+  /* ── COMMON SLIDE PARTS ─────────────────────────────── */
+  .eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .slide-title {
+    font-size: 36px; font-weight: 800; line-height: 1.1;
+    text-wrap: balance; margin-bottom: 6px;
+    letter-spacing: -.025em;
+  }
+  .slide-subtitle {
+    font-size: 16px; color: var(--dimmed); font-weight: 400;
+    margin-bottom: 24px; text-wrap: balance;
+  }
+  .sep {
+    width: 32px; height: 2px;
+    background: var(--accent);
+    margin-bottom: 20px;
+  }
+
+  /* ── GRID HELPERS ───────────────────────────────────── */
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; flex: 1; align-items: start; }
+  .cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; flex: 1; align-items: start; }
+  .cols-auto { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* ── CARDS ──────────────────────────────────────────── */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 3px; padding: 14px 18px;
+  }
+  .card-title {
+    font-size: 10px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+  }
+  .card-value {
+    font-size: 34px; font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+  }
+  .card-value.blue { color: var(--accent); }
+  .card-value.purple { color: #A78BFA; }
+  .card-value.green { color: var(--accent3); }
+  .card-value.yellow { color: var(--warn); }
+  .card-desc { font-size: 12px; color: var(--dimmed); margin-top: 4px; }
+
+  /* ── STAT GRID ──────────────────────────────────────── */
+  .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+  /* ── BADGE / TAG ─────────────────────────────────────── */
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 2px;
+    background: var(--tag-bg); color: var(--tag-text);
+    font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .tag.green  { background: #051F14; color: #3DBD8E; border-color: #0A3326; }
+  .tag.purple { background: #120D30; color: #A88CF0; border-color: #261550; }
+  .tag.yellow { background: #1C1100; color: #D4961C; border-color: #332000; }
+  .tag.red    { background: #1C0505; color: #D97070; border-color: #330A0A; }
+
+  /* ── TABLE ──────────────────────────────────────────── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th {
+    padding: 7px 12px; text-align: left;
+    font-size: 10px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  .tbl td {
+    padding: 8px 12px; border-bottom: 1px solid rgba(26,45,66,.7);
+    color: var(--dimmed);
+  }
+  .tbl td:first-child { color: var(--text); font-weight: 500; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 3px; }
+
+  /* ── CODE BLOCK ─────────────────────────────────────── */
+  .code {
+    background: #040A14; border: 1px solid var(--border);
+    border-radius: 3px; padding: 14px 18px;
+    font-family: 'JetBrains Mono', 'Consolas', monospace;
+    font-size: 12px; line-height: 1.65;
+    color: #8AA8CC; overflow-x: auto;
+  }
+  .code .kw  { color: #D870A8; }
+  .code .str { color: #5CA87A; }
+  .code .cm  { color: var(--muted); }
+  .code .num { color: #C8A040; }
+
+  /* ── TIMELINE ───────────────────────────────────────── */
+  .timeline { display: flex; flex-direction: column; gap: 0; flex: 1; }
+  .tl-item {
+    display: grid; grid-template-columns: 72px 16px 1fr;
+    gap: 0 14px; align-items: start; padding-bottom: 18px;
+  }
+  .tl-date {
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    text-align: right; padding-top: 2px;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .tl-dot-col { display: flex; flex-direction: column; align-items: center; }
+  .tl-dot {
+    width: 8px; height: 8px; border-radius: 0;
+    background: var(--accent); flex-shrink: 0; margin-top: 4px;
+  }
+  .tl-line { width: 1px; background: var(--border); flex: 1; margin: 4px 0; }
+  .tl-item:last-child .tl-line { display: none; }
+  .tl-content h4 { font-size: 13px; font-weight: 700; color: var(--text); }
+  .tl-content p  { font-size: 12px; color: var(--dimmed); margin-top: 2px; }
+
+  /* ── ARCH DIAGRAM ───────────────────────────────────── */
+  .arch { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .arch-row { display: flex; gap: 12px; justify-content: center; }
+  .arch-box {
+    border: 1px solid var(--border); border-radius: 3px;
+    padding: 12px 18px; text-align: center; flex: 1;
+    background: var(--card);
+  }
+  .arch-box .ab-label { font-size: 9px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
+  .arch-box .ab-name  { font-size: 14px; font-weight: 700; margin: 4px 0; }
+  .arch-box .ab-tech  { font-size: 11px; color: var(--dimmed); }
+  .arch-box.accent { border-color: var(--accent); }
+  .arch-box.purple { border-color: var(--accent2); }
+  .arch-box.green  { border-color: var(--accent3); }
+  .arch-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 16px; }
+
+  /* ── OWASP GRID ─────────────────────────────────────── */
+  .owasp-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .owasp-item {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 8px; text-align: center;
+  }
+  .owasp-item.ok      { border-color: #0A3326; background: rgba(6,78,59,.12); }
+  .owasp-item.partial { border-color: #332000; background: rgba(69,26,3,.12); }
+  .owasp-item .onum   { font-size: 10px; color: var(--muted); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .owasp-item .oname  { font-size: 10px; color: var(--text); margin-top: 2px; }
+  .owasp-item .ochk   { font-size: 13px; margin-top: 4px; font-weight: 700; }
+
+  /* ── CVE LIST ───────────────────────────────────────── */
+  .cve-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cve-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 8px 12px; font-size: 12px;
+  }
+  .cve-badge {
+    font-size: 9px; font-weight: 700; padding: 2px 6px;
+    border-radius: 1px; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .04em;
+  }
+  .cve-badge.C { background: #1C0505; color: #D97070; }
+  .cve-badge.H { background: #1C1100; color: #C8A040; }
+  .cve-badge.M { background: #0E1E30; color: #5598E8; }
+
+  /* ── SLIDE 1 — TITLE ────────────────────────────────── */
+  .title-slide { justify-content: center; align-items: flex-start; }
+  .title-slide .brand {
+    font-size: 76px; font-weight: 900; letter-spacing: -.04em;
+    color: var(--accent);
+    line-height: 1; margin-bottom: 16px;
+  }
+  .title-slide .tagline {
+    font-size: 20px; color: var(--dimmed); max-width: 560px;
+    margin-bottom: 36px; font-weight: 400; line-height: 1.5;
+  }
+  .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; }
+  .meta-chip {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 2px; padding: 5px 14px;
+    font-size: 12px; color: var(--dimmed);
+  }
+  .meta-chip strong { color: var(--text); }
+  .title-slide .version-note {
+    position: absolute; bottom: 80px; right: 64px;
+    font-size: 11px; color: var(--border); letter-spacing: .06em;
+  }
+
+  /* ── PILL ROW ───────────────────────────────────────── */
+  .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .pill {
+    padding: 4px 12px; border-radius: 2px; font-size: 12px; font-weight: 500;
+    background: var(--surface); border: 1px solid var(--border); color: var(--dimmed);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── ENDPOINT TABLE ─────────────────────────────────── */
+  .ep-row { display: flex; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(26,45,66,.6); font-size: 12px; }
+  .ep-method {
+    font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 1px;
+    min-width: 38px; text-align: center; flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace; letter-spacing: .04em;
+  }
+  .ep-method.GET   { background: #051F14; color: #3DBD8E; }
+  .ep-method.POST  { background: #0E1E30; color: #5598E8; }
+  .ep-method.PUT   { background: #1C1100; color: #C8A040; }
+  .ep-method.PATCH { background: #120D30; color: #A88CF0; }
+  .ep-method.DEL   { background: #1C0505; color: #D97070; }
+  .ep-path { color: var(--dimmed); font-family: 'JetBrains Mono', monospace; flex: 1; font-size: 11px; }
+  .ep-desc { color: var(--muted); font-size: 11px; min-width: 160px; text-align: right; }
+
+  /* ── ROLE CARDS ─────────────────────────────────────── */
+  .role-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 3px; padding: 14px 18px;
+  }
+  .role-card .role-name  { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .role-card .role-scope { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .role-perm { font-size: 12px; color: var(--dimmed); padding: 2px 0; display: flex; gap: 8px; align-items: center; }
+  .role-perm::before { content: '·'; color: var(--accent); font-size: 14px; line-height: 1; font-weight: 700; }
+
+  /* misc helpers */
+  .flex-1 { flex: 1; }
+  .mt-auto { margin-top: auto; }
+  .w100 { width: 100%; }
+  .text-center { text-align: center; }
+  .gap-sm { gap: 8px; }
+  .fs-sm { font-size: 12px; }
+  .dimmed { color: var(--dimmed); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+
+  /* ── RESPONSIVE ─────────────────────────────────────── */
+  @media (max-width: 900px) {
+    .deck { height: calc(100vh - 60px); }
+    .nav  { height: 60px; }
+    .slide { padding: 28px 28px 16px; }
+    .slide-title { font-size: 26px; }
+    .eyebrow { font-size: 9px; }
+    .sep { margin: 10px 0 18px; }
+    .cols-3 { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .deck { height: calc(100vh - 56px); }
+    .nav  { height: 56px; gap: 8px; }
+    .slide { padding: 16px 14px 12px; }
+    .slide-title { font-size: 20px; }
+    .card { padding: 10px 12px; }
+    .cols-2, .cols-3 { grid-template-columns: 1fr; }
+    .tbl { font-size: 11px; }
+  }
+
+  /* ── MODE CLAIR ─────────────────────────────────────── */
+  body.light-mode {
+    --bg:      #F0F5FB;
+    --surface: #E4EDF8;
+    --card:    #FFFFFF;
+    --border:  #C0D0E4;
+    --text:    #0F1E30;
+    --muted:   #4A6882;
+    --dimmed:  #1E3A5A;
+    --tag-bg:  #D8EAFC;
+    --tag-text:#1A5DC0;
+    background: var(--bg);
+    color: var(--text);
+  }
+  body.light-mode .slide { background: var(--bg); }
+  body.light-mode .title-slide { background: var(--bg) !important; }
+  body.light-mode .nav { background: var(--surface); border-color: var(--border); }
+  body.light-mode .nav button { color: var(--muted); border-color: var(--border); }
+  body.light-mode .nav button:hover { background: var(--card); color: var(--text); border-color: var(--accent); }
+  body.light-mode .counter { color: var(--muted); }
+  body.light-mode .tag.green  { background: #D0EEE3; color: #0A5C38; border-color: #9DCFC0; }
+  body.light-mode .tag.purple { background: #EAE4FC; color: #5B21B6; border-color: #C0ACEA; }
+  body.light-mode .tag.yellow { background: #FDF0CC; color: #7A4000; border-color: #E8C870; }
+  body.light-mode .tag.red    { background: #FCE4E4; color: #991B1B; border-color: #E0AAAA; }
+  body.light-mode .owasp-item.ok      { background: rgba(6,78,59,.07); }
+  body.light-mode .owasp-item.partial { background: rgba(69,26,3,.07); }
+  body.light-mode .code { background: #EDF2FA; color: #1E3A68; border-color: var(--border); }
+  body.light-mode .code .kw  { color: #A0185A; }
+  body.light-mode .code .str { color: #0A5C38; }
+  body.light-mode .code .cm  { color: #6A88A8; }
+  body.light-mode .code .num { color: #7A4000; }
+  body.light-mode .progress-bar { background: var(--accent); }
+  body.light-mode .pill { background: var(--surface); }
+  #theme-toggle { font-size: 11px; padding: 5px 12px; font-family: 'JetBrains Mono', monospace; letter-spacing: .06em; }
+</style>
+
+<div class="deck" id="deck">
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 1 — TITRE
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide active title-slide">
+    <div style="margin-top:auto; margin-bottom:auto;">
+      <div class="eyebrow">Soutenance de projet · CDA IPSSI 2026</div>
+      <div class="brand">BiblioTech</div>
+      <div class="tagline">Système Intégré de Gestion de Bibliothèque<br>SaaS multi-tenant · API REST · SPA React</div>
+      <div class="meta-chips">
+        <div class="meta-chip"><strong>Auteur</strong> Grégory Sergent</div>
+        <div class="meta-chip"><strong>Formation</strong> CDA · IPSSI Grande École</div>
+        <div class="meta-chip"><strong>Période</strong> Janv. à juil. 2026</div>
+        <div class="meta-chip"><strong>Jalons</strong> 6 / 6 ✓</div>
+      </div>
+      <div class="pill-row">
+        <span class="pill">Symfony 7.3</span>
+        <span class="pill">React 19</span>
+        <span class="pill">PostgreSQL 16</span>
+        <span class="pill">JWT RS256</span>
+        <span class="pill">Argon2id</span>
+        <span class="pill">Docker</span>
+        <span class="pill">GitHub Actions CI/CD</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 2 — SOMMAIRE
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Plan de la présentation</div>
+    <div class="slide-title">Sommaire</div>
+    <div class="sep"></div>
+    <div class="cols-2" style="gap:16px;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent);min-width:32px;">1</span>
+            <div><div style="font-size:14px;font-weight:600;">Contexte et besoin</div><div style="font-size:12px;color:var(--dimmed);">Marché, personas, user stories, périmètre</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent);min-width:32px;">2</span>
+            <div><div style="font-size:14px;font-weight:600;">Organisation du projet</div><div style="font-size:12px;color:var(--dimmed);">6 jalons, méthode agile, livrables, évolutions</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent);min-width:32px;">3</span>
+            <div><div style="font-size:14px;font-weight:600;">Stack et architecture</div><div style="font-size:12px;color:var(--dimmed);">Symfony, React 19, PostgreSQL, SaaS multi-tenant</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent);min-width:32px;">4</span>
+            <div><div style="font-size:14px;font-weight:600;">Modélisation</div><div style="font-size:12px;color:var(--dimmed);">BDD MERISE (MCD/MLD/MPD), UML, maquettes</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:#A78BFA;min-width:32px;">5</span>
+            <div><div style="font-size:14px;font-weight:600;">Développement</div><div style="font-size:12px;color:var(--dimmed);">Backend Symfony, frontend React 19, 51 endpoints</div></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:#A78BFA;min-width:32px;">6</span>
+            <div><div style="font-size:14px;font-weight:600;">Sécurité</div><div style="font-size:12px;color:var(--dimmed);">JWT RS256, OWASP Top 10, 14 CVE corrigées</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent3);min-width:32px;">7</span>
+            <div><div style="font-size:14px;font-weight:600;">Tests et qualité</div><div style="font-size:12px;color:var(--dimmed);">67/67 PHPUnit, intégration, unitaire</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent3);min-width:32px;">8</span>
+            <div><div style="font-size:14px;font-weight:600;">CI/CD et déploiement</div><div style="font-size:12px;color:var(--dimmed);">GitHub Actions, Docker, Render, Supabase</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent3);min-width:32px;">9</span>
+            <div><div style="font-size:14px;font-weight:600;">RGPD et conformité</div><div style="font-size:12px;color:var(--dimmed);">Article 30, anonymisation, droits utilisateurs</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:14px 18px;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span style="font-size:22px;font-weight:800;color:var(--accent3);min-width:32px;">10</span>
+            <div><div style="font-size:14px;font-weight:600;">Bilan</div><div style="font-size:12px;color:var(--dimmed);">Conformité CDC, difficultés, conclusion</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 3 — CONSTAT & PROBLÈME INITIAL
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Contexte</div>
+    <div class="slide-title">Un secteur en retard numérique</div>
+    <div class="sep"></div>
+    <div class="stat-grid" style="margin-bottom:24px;">
+      <div class="card">
+        <div class="card-title">Points de lecture</div>
+        <div class="card-value blue">16 500</div>
+        <div class="card-desc">bibliothèques & médiathèques en France</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Usagers inscrits</div>
+        <div class="card-value purple">17 M</div>
+        <div class="card-desc">22 % de la population française</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Prêts annuels</div>
+        <div class="card-value green">200 M+</div>
+        <div class="card-desc">documents empruntés par an</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Gestion traditionnelle</div>
+        <div class="card-value yellow">~40 %</div>
+        <div class="card-desc">des petites structures encore sur outils papier/tableurs</div>
+      </div>
+    </div>
+    <div class="cols-2" style="flex:none;">
+      <div class="card">
+        <div class="card-title">Problèmes identifiés</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+          <div class="tag red">Silos de données par établissement</div>
+          <div class="tag red">Pas de traçabilité des prêts fiable</div>
+          <div class="tag red">Coût d'infrastructure prohibitif</div>
+          <div class="tag red">Compétences serveur requises</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Notre réponse</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
+          <div class="tag green">SaaS, infrastructure mutualisée</div>
+          <div class="tag green">Zéro serveur côté bibliothèque</div>
+          <div class="tag green">API REST + SPA navigateur</div>
+          <div class="tag green">Multi-tenant avec isolation forte</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);">Source : Observatoire de la lecture publique (OLP) — Ministère de la Culture, 2023</div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 3 — PUBLIC CIBLE
+  ════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — ANALYSE DU BESOIN
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalon 1</div>
+    <div class="slide-title">Analyse du besoin</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Personas identifiés</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag" style="min-width:96px;justify-content:center;flex-shrink:0;">Sabine, 42</span>
+              <div style="font-size:13px;color:var(--dimmed);">Bibliothécaire municipale. Gère les prêts à la main, perd du temps sur les relances retards.</div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag purple" style="min-width:96px;justify-content:center;flex-shrink:0;">Marc, 55</span>
+              <div style="font-size:13px;color:var(--dimmed);">Directeur de médiathèque. Besoin de stats consolidées sans maîtriser Excel.</div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag green" style="min-width:96px;justify-content:center;flex-shrink:0;">Léa, 28</span>
+              <div style="font-size:13px;color:var(--dimmed);">Adhérente. Veut consulter ses prêts en cours depuis son téléphone, sans appeler la bibliothèque.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Problèmes métier identifiés</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <span class="tag red" style="width:fit-content;">Registres papier illisibles, pertes de données</span>
+            <span class="tag red" style="width:fit-content;">Pas d'alerte automatique pour les retards</span>
+            <span class="tag red" style="width:fit-content;">Impossible de savoir si un livre est dispo sans appeler</span>
+            <span class="tag red" style="width:fit-content;">Aucun historique des prêts exploitable</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">User stories prioritaires (MoSCoW)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;font-size:13px;">
+            <div style="padding:8px 12px;background:rgba(59,130,246,.08);border-radius:3px;border-left:3px solid var(--accent);">
+              <div style="color:var(--muted);font-size:11px;font-weight:600;margin-bottom:2px;letter-spacing:.05em;">MUST HAVE</div>
+              <div style="color:var(--dimmed);">En tant que bibliothécaire, je peux enregistrer un prêt via ISBN en moins de 30 secondes.</div>
+            </div>
+            <div style="padding:8px 12px;background:rgba(59,130,246,.08);border-radius:3px;border-left:3px solid var(--accent);">
+              <div style="color:var(--muted);font-size:11px;font-weight:600;margin-bottom:2px;letter-spacing:.05em;">MUST HAVE</div>
+              <div style="color:var(--dimmed);">En tant qu'admin, je vois le tableau de bord avec les prêts en retard de ma bibliothèque.</div>
+            </div>
+            <div style="padding:8px 12px;background:rgba(124,58,237,.08);border-radius:3px;border-left:3px solid var(--accent2);">
+              <div style="color:var(--muted);font-size:11px;font-weight:600;margin-bottom:2px;letter-spacing:.05em;">SHOULD HAVE</div>
+              <div style="color:var(--dimmed);">En tant qu'adhérent, je consulte mes prêts en cours et mon historique depuis l'application.</div>
+            </div>
+            <div style="padding:8px 12px;background:rgba(16,185,129,.08);border-radius:3px;border-left:3px solid var(--accent3);">
+              <div style="color:var(--muted);font-size:11px;font-weight:600;margin-bottom:2px;letter-spacing:.05em;">COULD HAVE</div>
+              <div style="color:var(--dimmed);">En tant qu'adhérent, je peux demander un transfert vers une autre bibliothèque.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — PÉRIMÈTRE FONCTIONNEL
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalon 1</div>
+    <div class="slide-title">Périmètre fonctionnel</div>
+    <div class="sep"></div>
+    <div class="cols-2" style="gap:20px;">
+      <div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent3);margin-bottom:12px;">Dans le périmètre</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span class="tag green">Catalogue livres (ISBN, Open Library API)</span>
+          <span class="tag green">Gestion des exemplaires par bibliothèque</span>
+          <span class="tag green">Enregistrement prêts et retours</span>
+          <span class="tag green">Suivi retards et alertes</span>
+          <span class="tag green">4 rôles : super_admin, admin, bibliothécaire, adhérent</span>
+          <span class="tag green">Multi-tenant, isolation par bibliothèque</span>
+          <span class="tag green">Statistiques tableau de bord</span>
+          <span class="tag green">Demandes de migration inter-bibliothèque</span>
+          <span class="tag green">CGU versionnées avec acceptation obligatoire</span>
+          <span class="tag green">Authentification JWT + rotation refresh token</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#F87171;margin-bottom:12px;">Hors périmètre</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span class="tag red">Réservation en ligne d'exemplaires</span>
+          <span class="tag red">Paiements ou amendes en ligne</span>
+          <span class="tag red">Application mobile native</span>
+          <span class="tag red">Catalogue national partagé</span>
+          <span class="tag red">Gestion documentaire (périodiques, DVD…)</span>
+          <span class="tag red">Portail public sans authentification</span>
+        </div>
+        <div class="card" style="margin-top:16px;">
+          <div class="card-title">Contraintes techniques imposées</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.8;">
+            Symfony PHP LTS · React ou Angular · PostgreSQL<br>
+            Docker · GitHub Actions CI/CD · Tests PHPUnit<br>
+            OWASP Top 10 · RGPD · API externe · 6 jalons documentés
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide">
+    <div class="eyebrow">Marché cible</div>
+    <div class="slide-title">Qui utilise BiblioTech ?</div>
+    <div class="sep"></div>
+    <div class="cols-2" style="gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card" style="border-color:rgba(59,130,246,.4);">
+          <div class="card-title" style="color:var(--accent);">Client principal</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Bibliothèques municipales</div>
+          <div style="font-size:13px;color:var(--dimmed);">Petites et moyennes structures publiques. Besoin : remplacer leur SIGB vieillissant ou migrer du papier.</div>
+        </div>
+        <div class="card" style="border-color:rgba(124,58,237,.4);">
+          <div class="card-title" style="color:#A78BFA;">Client secondaire</div>
+          <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Médiathèques & CDI</div>
+          <div style="font-size:13px;color:var(--dimmed);">Structures à budget limité cherchant une solution hébergée clés en main.</div>
+        </div>
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title" style="color:var(--accent3);">Modèle économique SaaS</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:4px;">BiblioTech (la société fictive) finance l'infrastructure. Les bibliothèques s'abonnent. Zéro serveur, zéro maintenance côté client.</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card-title" style="margin-bottom:0;">Utilisateurs de l'application</div>
+        <div class="role-card" style="border-color:rgba(239,68,68,.3);">
+          <div class="role-name" style="color:#FCA5A5;">Super Admin <span style="font-weight:400;font-size:12px;color:var(--muted);">BiblioTech</span></div>
+          <div class="role-perm">Gère l'ensemble de la plateforme</div>
+          <div class="role-perm">Approuve les migrations entre bibliothèques</div>
+          <div class="role-perm">Accès toutes données (multi-tenant)</div>
+        </div>
+        <div class="role-card" style="border-color:rgba(245,158,11,.3);">
+          <div class="role-name" style="color:#FCD34D;">Admin <span style="font-weight:400;font-size:12px;color:var(--muted);">par bibliothèque</span></div>
+          <div class="role-perm">CRUD utilisateurs de sa bibliothèque</div>
+          <div class="role-perm">Catalogue & paramètres locaux</div>
+        </div>
+        <div class="role-card" style="border-color:rgba(59,130,246,.3);">
+          <div class="role-name" style="color:#93C5FD;">Bibliothécaire</div>
+          <div class="role-perm">Gestion des prêts & retours</div>
+          <div class="role-perm">Catalogue (exemplaires)</div>
+        </div>
+        <div class="role-card" style="border-color:rgba(16,185,129,.3);">
+          <div class="role-name" style="color:#6EE7B7;">Adhérent</div>
+          <div class="role-perm">Consulte ses prêts en cours</div>
+          <div class="role-perm">Gère son profil</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 4 — PLANIFICATION
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Organisation du projet</div>
+    <div class="slide-title">6 jalons · jan. 2026 à juil. 2026</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div class="timeline" style="flex:none;">
+        <div class="tl-item">
+          <div class="tl-date">Jan 2026</div>
+          <div class="tl-dot-col"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-content"><h4>Jalon 1 : CDCF</h4><p>Cahier des charges fonctionnel, personas, user stories, maquettes fil de fer</p></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">Fév 2026</div>
+          <div class="tl-dot-col"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-content"><h4>Jalon 2 : Méthodologie & UX</h4><p>Méthode agile, charte graphique, maquettes Figma, parcours utilisateur</p></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">Mar 2026</div>
+          <div class="tl-dot-col"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-content"><h4>Jalon 3 : Base de données</h4><p>MCD, MLD, MPD, dictionnaire de données, PostgreSQL 16</p></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">Avr 2026</div>
+          <div class="tl-dot-col"><div class="tl-dot"></div><div class="tl-line"></div></div>
+          <div class="tl-content"><h4>Jalon 4 : Architecture UML</h4><p>Diagrammes de classes, séquences, choix techniques</p></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">Mai–Juin 26</div>
+          <div class="tl-dot-col"><div class="tl-dot" style="background:var(--accent2);"></div><div class="tl-line"></div></div>
+          <div class="tl-content"><h4>Jalon 5 : Développement</h4><p>API REST Symfony 7 complète, SPA React 19, tests PHPUnit, sécurité OWASP</p></div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-date">Juil 2026</div>
+          <div class="tl-dot-col"><div class="tl-dot" style="background:var(--accent3);"></div></div>
+          <div class="tl-content"><h4>Jalon 6 : Déploiement & Audit</h4><p>14 CVE corrigées, CI/CD GitHub Actions, Docker, RGPD, tag v1.0.0 · Backend Render · BDD Supabase</p></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+          <div class="card-title">Workflow Git</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div style="font-size:13px;color:var(--dimmed);display:flex;gap:8px;align-items:center;">
+              <span class="tag" style="min-width:80px;justify-content:center;">main</span> Branche de production, releases taguées
+            </div>
+            <div style="font-size:13px;color:var(--dimmed);display:flex;gap:8px;align-items:center;">
+              <span class="tag purple" style="min-width:80px;justify-content:center;">develop</span> Intégration des features en cours
+            </div>
+            <div style="font-size:13px;color:var(--dimmed);display:flex;gap:8px;align-items:center;">
+              <span class="tag green" style="min-width:80px;justify-content:center;">feat/*</span> Une branche par feature, merge via PR
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Méthode</div>
+          <div style="font-size:14px;margin-top:6px;color:var(--dimmed);line-height:1.6;">
+            Développement itératif inspiré <strong style="color:var(--text);">Agile/Scrum</strong>.
+            Backlog priorisé par jalon. Revues de code via Pull Requests GitHub.
+            Tests automatisés à chaque push.
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Livrables</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;">
+            <div class="tag green">6 jalons documentés</div>
+            <div class="tag green">Code source GitHub (public)</div>
+            <div class="tag green">Pipeline CI/CD fonctionnel</div>
+            <div class="tag green">Audit sécurité SECURITY_NOTE.md</div>
+            <div class="tag green">Tag v1.0.0 — main ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 5 — STACK TECHNIQUE OVERVIEW
+  ════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — ÉVOLUTION DU PÉRIMÈTRE
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalons 3 et 5</div>
+    <div class="slide-title">Évolution du périmètre en cours de projet</div>
+    <div class="sep"></div>
+    <div class="cols-2" style="gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card" style="border-color:rgba(245,158,11,.4);">
+          <div class="card-title" style="color:var(--warn);">Décision initiale (Jalon 1)</div>
+          <div style="font-size:14px;font-weight:700;margin:8px 0 4px;">Tauri, application desktop native</div>
+          <div style="font-size:13px;color:var(--dimmed);">Le CDCF prévoyait une distribution sous forme d'application native Windows/macOS, packagée avec Tauri (wrapper Rust sur React).</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <span class="tag yellow">Windows NSIS</span>
+            <span class="tag yellow">macOS .dmg</span>
+            <span class="tag yellow">Auto-update</span>
+          </div>
+        </div>
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title" style="color:var(--accent3);">Décision finale (Jalon 5)</div>
+          <div style="font-size:14px;font-weight:700;margin:8px 0 4px;">SPA web déployée sur Render</div>
+          <div style="font-size:13px;color:var(--dimmed);">Changement motivé par la cohérence avec le modèle SaaS : une URL suffit, zéro installation côté bibliothèque, déploiement continu simplifié.</div>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+            <span class="tag green">Vite build</span>
+            <span class="tag green">Render deploy</span>
+            <span class="tag green">Zéro install</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card" style="border-color:rgba(59,130,246,.4);">
+          <div class="card-title" style="color:var(--accent);">Ajout du rôle adhérent (Jalon 3)</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Le Jalon 1 ciblait uniquement le personnel (bibliothécaires, admins). La modélisation BDD a mis en évidence la valeur d'un accès adhérent :
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+            <span class="tag green">Consulte ses prêts et son historique</span>
+            <span class="tag green">Gère son profil et son mot de passe</span>
+            <span class="tag green">Soumet des demandes de migration</span>
+            <span class="tag red">Ne peut pas réserver ni modifier le catalogue</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Conformité CDC</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;line-height:1.7;">
+            Ces deux évolutions ont été <strong style="color:var(--text);">validées au regard du CDC technique</strong>. Elles renforcent la cohérence du produit sans contredire les exigences initiales. Le CDC imposait React/Angular et Symfony, pas Tauri.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide">
+    <div class="eyebrow">Choix techniques</div>
+    <div class="slide-title">Stack complète</div>
+    <div class="sep"></div>
+    <div class="cols-3">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);">Backend</div>
+        <div class="card">
+          <div class="card-title">Framework</div>
+          <div style="font-size:20px;font-weight:700;">Symfony 7.3</div>
+          <div class="card-desc">PHP ≥ 8.3 · REST API</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Base de données</div>
+          <div style="font-size:20px;font-weight:700;">PostgreSQL 16</div>
+          <div class="card-desc">Doctrine ORM · 8 entités · 5 migrations</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Auth</div>
+          <div style="font-size:20px;font-weight:700;">JWT RS256</div>
+          <div class="card-desc">LexikJWT · RSA 4096-bit · 8h access / 30j refresh</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Passwords</div>
+          <div style="font-size:20px;font-weight:700;">Argon2id</div>
+          <div class="card-desc">memory: 64 Mo · time: 4 (OWASP compliant)</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#A78BFA;">Frontend</div>
+        <div class="card" style="border-color:rgba(124,58,237,.4);">
+          <div class="card-title">Framework</div>
+          <div style="font-size:20px;font-weight:700;">React 19</div>
+          <div class="card-desc">TypeScript · Vite 8 · SPA navigateur</div>
+        </div>
+        <div class="card">
+          <div class="card-title">HTTP</div>
+          <div style="font-size:20px;font-weight:700;">Axios</div>
+          <div class="card-desc">Intercepteurs auth · gestion erreurs centralisée</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Routing</div>
+          <div style="font-size:20px;font-weight:700;">React Router 7</div>
+          <div class="card-desc">10 pages · guards ProtectedRoute</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Styles</div>
+          <div style="font-size:20px;font-weight:700;">Tailwind CSS 4</div>
+          <div class="card-desc">Framer Motion · Heroicons</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent3);">Infrastructure</div>
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title">Conteneurs (dev)</div>
+          <div style="font-size:20px;font-weight:700;">Docker Compose</div>
+          <div class="card-desc">3 services : backend · frontend · db</div>
+        </div>
+        <div class="card">
+          <div class="card-title">CI/CD</div>
+          <div style="font-size:20px;font-weight:700;">GitHub Actions</div>
+          <div class="card-desc">3 jobs · PHPUnit + TypeScript + Docker Hub</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tests</div>
+          <div style="font-size:20px;font-weight:700;">PHPUnit</div>
+          <div class="card-desc">8 suites · Integration + Unit</div>
+        </div>
+        <div class="card">
+          <div class="card-title">API externe</div>
+          <div style="font-size:20px;font-weight:700;">Open Library</div>
+          <div class="card-desc">Recherche ISBN, métadonnées livres (gratuit, sans clé)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 6 — ARCHITECTURE SAAS
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Architecture</div>
+    <div class="slide-title">SaaS multi-tenant, isolation applicative</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card" style="background:var(--surface);border-color:rgba(59,130,246,.3);">
+          <div class="card-title" style="color:var(--accent);">Environnement développement (actuel)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag">Docker</span> <span class="dimmed">3 services sur la machine du développeur</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag">localhost:5173</span> <span class="dimmed">SPA React (Vite dev server)</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag">localhost:8080</span> <span class="dimmed">API Symfony (PHP-FPM)</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag">localhost:5432</span> <span class="dimmed">PostgreSQL 16 local</span>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="background:var(--surface);border-color:rgba(16,185,129,.3);">
+          <div class="card-title" style="color:var(--accent3);">Production, déployé ✓</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag green">Render</span> <span class="dimmed">Backend Symfony, image Docker Hub v1.0.0</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag green">Supabase</span> <span class="dimmed">PostgreSQL 16 managé, EU, SSL (actif)</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;font-size:13px;">
+              <span class="tag green">Docker Hub</span> <span class="dimmed">Images :latest + :v1.0.0 publiées</span>
+            </div>
+            <div style="font-size:11px;color:#6EE7B7;padding:4px 0;border-top:1px solid var(--border);margin-top:4px;">
+              ✓ Déploiement cloud actif · tag v1.0.0 en production
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Multi-tenant, isolation par bibliotheque_id</div>
+          <div class="code" style="margin-top:10px;font-size:12px;">
+<span class="cm">// Pattern appliqué sur tous les endpoints</span>
+<span class="kw">if</span> ($user->getRole() !== <span class="str">'super_admin'</span>
+    && $entity->getBibliothequeId()
+       !== $user->getBibliothequeId()) {
+    <span class="kw">return</span> $this->json([
+        <span class="str">'code'</span> => <span class="str">'ACCESS_DENIED'</span>
+    ], Response::HTTP_FORBIDDEN);
+}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Principe SaaS</div>
+          <div style="font-size:13px;color:var(--dimmed);line-height:1.7;margin-top:6px;">
+            Une seule instance d'API, une seule base de données PostgreSQL.<br>
+            Chaque bibliothèque a ses données <strong style="color:var(--text);">isolées par bibliotheque_id</strong> au niveau applicatif.<br>
+            Le <strong style="color:var(--text);">super_admin</strong> (BiblioTech) a un accès cross-tenant (bibliotheque_id null).
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 7 — BACKEND : CONTROLLERS & ENDPOINTS
+  ════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — MODÉLISATION BDD
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalon 3</div>
+    <div class="slide-title">Modélisation de la base de données</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Démarche MERISE</div>
+          <div style="display:flex;gap:10px;margin-top:12px;align-items:center;justify-content:center;">
+            <div style="text-align:center;padding:10px 16px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);border-radius:3px;">
+              <div style="font-size:11px;color:var(--muted);">Conceptuel</div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent);">MCD</div>
+            </div>
+            <div style="color:var(--muted);font-size:20px;font-weight:300;">›</div>
+            <div style="text-align:center;padding:10px 16px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.3);border-radius:3px;">
+              <div style="font-size:11px;color:var(--muted);">Logique</div>
+              <div style="font-size:18px;font-weight:700;color:#A78BFA;">MLD</div>
+            </div>
+            <div style="color:var(--muted);font-size:20px;font-weight:300;">›</div>
+            <div style="text-align:center;padding:10px 16px;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:3px;">
+              <div style="font-size:11px;color:var(--muted);">Physique</div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent3);">MPD</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">6 tables PostgreSQL</div>
+          <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;border-bottom:1px solid rgba(42,51,80,.4);"><code style="color:var(--text);">bibliotheques</code><span>Entité cliente de la plateforme</span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;border-bottom:1px solid rgba(42,51,80,.4);"><code style="color:var(--text);">utilisateurs</code><span>Tous rôles (RBAC via <code>role</code>)</span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;border-bottom:1px solid rgba(42,51,80,.4);"><code style="color:var(--text);">livres</code><span>Catalogue global (ISBN, métadonnées)</span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;border-bottom:1px solid rgba(42,51,80,.4);"><code style="color:var(--text);">exemplaires</code><span>Stock physique par bibliothèque</span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;border-bottom:1px solid rgba(42,51,80,.4);"><code style="color:var(--text);">prets</code><span>Prêts actifs et historique</span></div>
+            <div style="display:flex;justify-content:space-between;color:var(--dimmed);padding:4px 0;"><code style="color:var(--text);">demandes_migration</code><span>Transferts inter-bibliothèque</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Relations clés (cardinalités)</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:10px;line-height:2;font-family:'Courier New',monospace;font-size:12px;">
+            <span style="color:var(--accent);">bibliotheques</span> (1,1) — (0,n) <span style="color:var(--accent);">utilisateurs</span><br>
+            <span style="color:var(--accent);">bibliotheques</span> (1,1) — (0,n) <span style="color:var(--accent);">exemplaires</span><br>
+            <span style="color:var(--accent);">livres</span> (1,1) — (0,n) <span style="color:var(--accent);">exemplaires</span><br>
+            <span style="color:var(--accent);">exemplaires</span> (1,1) — (0,n) <span style="color:var(--accent);">prets</span><br>
+            <span style="color:var(--accent);">utilisateurs</span> (1,1) — (0,n) <span style="color:var(--accent);">prets</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Choix de modélisation</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            <strong style="color:var(--text);">Catalogue global + exemplaires séparés :</strong> évite la duplication des métadonnées. Un livre = une entrée, le stock par bibliothèque dans <code>exemplaires</code>.<br><br>
+            <strong style="color:var(--text);">ON DELETE RESTRICT</strong> sur les FK critiques : empêche la suppression d'une bibliothèque avec des prêts actifs.<br><br>
+            <strong style="color:var(--text);">Normalisation 3NF</strong>, aucune dépendance transitive.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — DIAGRAMMES UML
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalon 4</div>
+    <div class="slide-title">Architecture logicielle et diagrammes UML</div>
+    <div class="sep"></div>
+    <div class="cols-3">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card" style="border-color:rgba(59,130,246,.4);">
+          <div class="card-title" style="color:var(--accent);">Diagramme de classes</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            8 entités Doctrine avec attributs, associations et multiplicités.<br><br>
+            Points clés :<br>
+            · <code>Utilisateur</code> porte le <code>role</code> (RBAC)<br>
+            · <code>Pret</code> lie exemplaire + adhérent + bibliothèque<br>
+            · <code>RefreshToken</code> lié à l'utilisateur (1,n)
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Couches applicatives</div>
+          <div style="font-size:13px;margin-top:10px;text-align:center;line-height:1.8;">
+            <div style="padding:5px;background:rgba(59,130,246,.1);border-radius:3px;color:var(--accent);font-weight:600;margin-bottom:2px;">Controller</div>
+            <div style="color:var(--muted);font-size:11px;">↓ injection</div>
+            <div style="padding:5px;background:rgba(124,58,237,.1);border-radius:3px;color:#A78BFA;font-weight:600;margin-bottom:2px;">Service</div>
+            <div style="color:var(--muted);font-size:11px;">↓ Doctrine</div>
+            <div style="padding:5px;background:rgba(16,185,129,.1);border-radius:3px;color:var(--accent3);font-weight:600;margin-bottom:2px;">Repository</div>
+            <div style="color:var(--muted);font-size:11px;">↓ ORM</div>
+            <div style="padding:5px;background:rgba(245,158,11,.1);border-radius:3px;color:var(--warn);font-weight:600;">Entity (Doctrine)</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card" style="border-color:rgba(124,58,237,.4);">
+          <div class="card-title" style="color:#A78BFA;">Diagramme de cas d'utilisation</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            4 acteurs et leurs interactions :<br><br>
+            · <strong style="color:#FCA5A5;">Super Admin</strong> : gestion globale<br>
+            · <strong style="color:#FCD34D;">Admin</strong> : CRUD bibliothèque<br>
+            · <strong style="color:#93C5FD;">Bibliothécaire</strong> : catalogue, prêts<br>
+            · <strong style="color:#6EE7B7;">Adhérent</strong> : lecture seule
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Fichiers PlantUML</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <span class="tag" style="font-size:11px;width:fit-content;">Classes.puml</span>
+            <span class="tag" style="font-size:11px;width:fit-content;">UseCases.puml</span>
+            <span class="tag" style="font-size:11px;width:fit-content;">Sequences.puml</span>
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);margin-top:10px;">3 diagrammes générés en PNG, intégrés dans le dossier technique final.</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title" style="color:var(--accent3);">Diagramme de séquences</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Scénarios clés modélisés :<br><br>
+            · Authentification JWT (login + refresh)<br>
+            · Enregistrement d'un prêt<br>
+            · Retour d'un exemplaire<br>
+            · Recherche ISBN via Open Library
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Choix d'architecture</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            API REST stateless + SPA découplée. Communication JSON sur HTTPS. CORS configuré via NelmioCors. Serialization groups Symfony pour contrôler l'exposition des données.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide">
+    <div class="eyebrow">Backend Symfony</div>
+    <div class="slide-title">9 controllers, 51 endpoints REST</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Controller</th><th>Routes</th><th>Périmètre</th></tr></thead>
+            <tbody>
+              <tr><td>AuthController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">3</td><td>Login · Refresh · Logout</td></tr>
+              <tr><td>UtilisateurController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">12</td><td>CRUD · profil · suspension</td></tr>
+              <tr><td>LivreController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">6</td><td>Catalogue · ISBN lookup</td></tr>
+              <tr><td>ExemplaireController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">6</td><td>Exemplaires · statuts</td></tr>
+              <tr><td>PretController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">6</td><td>Prêts · retours · retards</td></tr>
+              <tr><td>BibliothequeController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">6</td><td>CRUD bibliothèques</td></tr>
+              <tr><td>DemandeMigrationController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">6</td><td>Migrations inter-biblio</td></tr>
+              <tr><td>CguController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">4</td><td>CGU · versionnement</td></tr>
+              <tr><td>StatController</td><td style="color:var(--accent);font-variant-numeric:tabular-nums;">2</td><td>Statistiques dashboards</td></tr>
+              <tr><td style="font-weight:700;color:var(--text);">TOTAL</td><td style="color:var(--accent3);font-weight:800;font-variant-numeric:tabular-nums;">51</td><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Pattern architectural</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.8;">
+            <code style="color:var(--accent);">Controller</code> → <code style="color:#A78BFA;">Service</code> → <code style="color:var(--accent3);">Repository</code> → <code style="color:var(--warn);">Entity</code><br>
+            Séparation stricte des responsabilités.<br>
+            Sérialisation Symfony avec groupes (évite la surexposition).
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">8 entités Doctrine</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+            <span class="tag">Utilisateur</span>
+            <span class="tag">Bibliotheque</span>
+            <span class="tag">Livre</span>
+            <span class="tag">Exemplaire</span>
+            <span class="tag">Pret</span>
+            <span class="tag">RefreshToken</span>
+            <span class="tag">CguVersion</span>
+            <span class="tag">DemandeMigration</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">2 services métier</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            <strong style="color:var(--text);">OpenLibraryService</strong> : ISBN, couverture et métadonnées<br>
+            <strong style="color:var(--text);">PretService</strong> : logique prêt/retour, vérifications métier
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">5 migrations Doctrine</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;font-family:'Courier New',monospace;line-height:1.8;">
+            Version20260501000000 <span style="color:var(--muted);">— schema initial</span><br>
+            Version20260526000000 <span style="color:var(--muted);">— refresh token</span><br>
+            Version20260601000000 <span style="color:var(--muted);">— CGU versioning</span><br>
+            Version20260602000000 <span style="color:var(--muted);">— brute-force fields</span><br>
+            Version20260603000000 <span style="color:var(--muted);">— prêt etat_depart</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 8 — FRONTEND REACT 19
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Frontend</div>
+    <div class="slide-title">SPA React 19, 10 pages</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Page</th><th>Rôles</th></tr></thead>
+            <tbody>
+              <tr><td>LoginPage</td><td>public</td></tr>
+              <tr><td>PremierLoginMotDePassePage</td><td>all (first login)</td></tr>
+              <tr><td>PremierLoginCguPage</td><td>all (first login)</td></tr>
+              <tr><td>DashboardPage</td><td>all</td></tr>
+              <tr><td>CataloguePage</td><td>all</td></tr>
+              <tr><td>PretsPage</td><td>bibliothecaire+</td></tr>
+              <tr><td>AdherentsPage</td><td>admin+</td></tr>
+              <tr><td>MonComptePage</td><td>all</td></tr>
+              <tr><td>DemandeMigrationPage</td><td>all</td></tr>
+              <tr><td>BibliothequeManagementPage</td><td>super_admin</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Architecture frontend</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            <strong style="color:var(--text);">Context API</strong> : AuthContext · CguContext · GlobalLoadingContext<br>
+            <strong style="color:var(--text);">Services</strong> : 8 modules Axios (auth, livres, exemplaires, prêts…)<br>
+            <strong style="color:var(--text);">Guards</strong> : ProtectedRoute, vérifie auth + must_change_password + CGU<br>
+            <strong style="color:var(--text);">Hook custom</strong> : useApiCall, gestion state/loading/error
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Flux premier login (sécurité)</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:8px;font-size:13px;align-items:center;">
+              <span style="color:var(--accent);font-weight:700;">1.</span>
+              <span class="dimmed">Login → JWT émis avec <code style="color:#FCD34D;">mustChangePassword: true</code></span>
+            </div>
+            <div style="display:flex;gap:8px;font-size:13px;align-items:center;">
+              <span style="color:var(--accent);font-weight:700;">2.</span>
+              <span class="dimmed">ProtectedRoute → redirige vers changement mot de passe</span>
+            </div>
+            <div style="display:flex;gap:8px;font-size:13px;align-items:center;">
+              <span style="color:var(--accent);font-weight:700;">3.</span>
+              <span class="dimmed">Puis vérification version CGU → acceptation obligatoire</span>
+            </div>
+            <div style="display:flex;gap:8px;font-size:13px;align-items:center;">
+              <span style="color:var(--accent);font-weight:700;">4.</span>
+              <span class="dimmed">Accès à l'application autorisé</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Stack frontend exacte</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+            <span class="tag">React 19.2</span>
+            <span class="tag">TypeScript ~6</span>
+            <span class="tag">Vite 8</span>
+            <span class="tag">Axios 1.14</span>
+            <span class="tag">React Router 7</span>
+            <span class="tag">Tailwind CSS 4</span>
+            <span class="tag">Framer Motion 12</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 9 — AUTHENTIFICATION JWT
+  ════════════════════════════════════════════════════════ -->
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — MAQUETTES & UX
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Jalon 2</div>
+    <div class="slide-title">Maquettes et parcours utilisateur</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Charte graphique</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+            <div style="width:30px;height:30px;border-radius:50%;background:#3B82F6;border:2px solid var(--border);"></div>
+            <div style="width:30px;height:30px;border-radius:50%;background:#7C3AED;border:2px solid var(--border);"></div>
+            <div style="width:30px;height:30px;border-radius:50%;background:#10B981;border:2px solid var(--border);"></div>
+            <div style="width:30px;height:30px;border-radius:50%;background:#F59E0B;border:2px solid var(--border);"></div>
+            <div style="width:30px;height:30px;border-radius:50%;background:#1A2235;border:2px solid var(--border);"></div>
+            <div style="font-size:12px;color:var(--dimmed);margin-left:4px;">Fond sombre · bleu primaire · violet accent</div>
+          </div>
+          <div style="margin-top:10px;font-size:13px;color:var(--dimmed);">Inter / System UI · grille 12 colonnes · hiérarchie H1–H4 · responsive</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Écrans implémentés</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:13px;">
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Connexion / Premiers-login</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Tableau de bord statistiques</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Catalogue et exemplaires</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Gestion des prêts et retours</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Adhérents et rôles</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(42,51,80,.3);color:var(--dimmed);"><span>Demandes de migration</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;color:var(--dimmed);"><span>Mon compte + CGU</span><span class="tag green" style="font-size:11px;padding:2px 6px;">✓</span></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="card">
+          <div class="card-title">Parcours premier login</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+            <div style="display:flex;gap:10px;align-items:center;font-size:13px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</div>
+              <span style="color:var(--dimmed);">L'admin crée le compte, mot de passe temporaire généré</span>
+            </div>
+            <div style="width:2px;height:10px;background:var(--border);margin-left:12px;"></div>
+            <div style="display:flex;gap:10px;align-items:center;font-size:13px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</div>
+              <span style="color:var(--dimmed);">Première connexion, changement de mot de passe obligatoire</span>
+            </div>
+            <div style="width:2px;height:10px;background:var(--border);margin-left:12px;"></div>
+            <div style="display:flex;gap:10px;align-items:center;font-size:13px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">3</div>
+              <span style="color:var(--dimmed);">Acceptation obligatoire des CGU en vigueur (modale bloquante)</span>
+            </div>
+            <div style="width:2px;height:10px;background:var(--border);margin-left:12px;"></div>
+            <div style="display:flex;gap:10px;align-items:center;font-size:13px;">
+              <div style="width:26px;height:26px;border-radius:50%;background:var(--accent3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;">✓</div>
+              <span style="color:var(--dimmed);">Accès complet selon le rôle</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Responsive &amp; accessibilité</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Sidebar rétractable sur mobile, bottom sheets pour les formulaires, header mobile avec menu hamburger. Attributs ARIA sur les boutons critiques.
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+            <span class="tag">Desktop</span>
+            <span class="tag">Tablet</span>
+            <span class="tag">Mobile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE — FONCTIONNALITÉS IMPLÉMENTÉES
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Développement</div>
+    <div class="slide-title">Fonctionnalités implémentées</div>
+    <div class="sep"></div>
+    <div class="tbl-wrap" style="flex:1;overflow-y:auto;">
+      <table class="tbl">
+        <thead>
+          <tr><th>Fonctionnalité</th><th>Backend</th><th>Frontend</th><th>Tests</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Authentification JWT + refresh token</td><td><span class="tag green" style="font-size:11px;">AuthController</span></td><td><span class="tag green" style="font-size:11px;">AuthContext</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Gestion des bibliothèques (CRUD)</td><td><span class="tag green" style="font-size:11px;">BibliothequeCtrl</span></td><td><span class="tag green" style="font-size:11px;">BiblioPage</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Catalogue livres + ISBN Open Library</td><td><span class="tag green" style="font-size:11px;">LivreCtrl</span></td><td><span class="tag green" style="font-size:11px;">CataloguePage</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Exemplaires par bibliothèque</td><td><span class="tag green" style="font-size:11px;">ExemplaireCtrl</span></td><td><span class="tag green" style="font-size:11px;">inline</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Prêts, retours et suivi retards</td><td><span class="tag green" style="font-size:11px;">PretCtrl</span></td><td><span class="tag green" style="font-size:11px;">PretsPage</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Gestion utilisateurs et rôles (RBAC)</td><td><span class="tag green" style="font-size:11px;">UtilisateurCtrl</span></td><td><span class="tag green" style="font-size:11px;">AdherentsPage</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Demandes de migration inter-bibliothèque</td><td><span class="tag green" style="font-size:11px;">DemandeMigCtrl</span></td><td><span class="tag green" style="font-size:11px;">DemandePage</span></td><td><span class="tag" style="font-size:11px;">—</span></td></tr>
+          <tr><td>CGU versionnées + acceptation obligatoire</td><td><span class="tag green" style="font-size:11px;">CguCtrl</span></td><td><span class="tag green" style="font-size:11px;">CguContext</span></td><td><span class="tag" style="font-size:11px;">—</span></td></tr>
+          <tr><td>Statistiques tableau de bord</td><td><span class="tag green" style="font-size:11px;">StatCtrl</span></td><td><span class="tag green" style="font-size:11px;">Dashboard</span></td><td><span class="tag" style="font-size:11px;">—</span></td></tr>
+          <tr><td>Protection brute-force login</td><td><span class="tag green" style="font-size:11px;">RateLimiter</span></td><td><span class="tag green" style="font-size:11px;">erreur 429</span></td><td><span class="tag green" style="font-size:11px;">✓</span></td></tr>
+          <tr><td>Premier login (mdp temporaire + CGU)</td><td><span class="tag green" style="font-size:11px;">must_change_pwd</span></td><td><span class="tag green" style="font-size:11px;">ProtectedRoute</span></td><td><span class="tag" style="font-size:11px;">—</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="slide">
+    <div class="eyebrow">Sécurité · Authentification</div>
+    <div class="slide-title">JWT RS256 + Refresh Token rotation</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="stat-grid" style="grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="card">
+            <div class="card-title">Algorithme</div>
+            <div class="card-value blue" style="font-size:28px;">RS256</div>
+            <div class="card-desc">RSA 4096-bit keypair</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Access Token TTL</div>
+            <div class="card-value blue" style="font-size:28px;">8 h</div>
+            <div class="card-desc">28 800 secondes</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Refresh Token TTL</div>
+            <div class="card-value purple" style="font-size:28px;">30 j</div>
+            <div class="card-desc">Token opaque rotation</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Brute-force</div>
+            <div class="card-value yellow" style="font-size:28px;">5 / 15'</div>
+            <div class="card-desc">Verrou compte + rate limiter IP</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Mots de passe : Argon2id</div>
+          <div class="code" style="font-size:12px;margin-top:8px;">
+<span class="cm"># security.yaml</span>
+password_hashers:
+  App\Entity\Utilisateur:
+    algorithm: <span class="str">argon2id</span>
+    memory_cost: <span class="num">65536</span>  <span class="cm"># 64 Mo</span>
+    time_cost: <span class="num">4</span>        <span class="cm"># 4 itérations</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Flux d'authentification</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+            <div class="ep-row" style="border:none;padding:5px 0;">
+              <span class="ep-method POST">POST</span>
+              <span class="ep-path">/api/login</span>
+              <span class="ep-desc">→ JWT + RefreshToken</span>
+            </div>
+            <div class="ep-row" style="border:none;padding:5px 0;">
+              <span class="ep-method POST">POST</span>
+              <span class="ep-path">/api/token/refresh</span>
+              <span class="ep-desc">→ nouveau JWT (rotation)</span>
+            </div>
+            <div class="ep-row" style="border:none;padding:5px 0;">
+              <span class="ep-method POST">POST</span>
+              <span class="ep-path">/api/logout</span>
+              <span class="ep-desc">→ révocation RefreshToken</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Double protection anti-brute force</div>
+          <div style="font-size:13px;color:var(--dimmed);line-height:1.8;margin-top:8px;">
+            <strong style="color:var(--text);">Rate limiter IP</strong> (Symfony Limiter) :<br>
+            → 10 tentatives / 5 minutes par IP<br><br>
+            <strong style="color:var(--text);">Verrou compte</strong> (base de données) :<br>
+            → 5 tentatives échouées → lockedUntil +15 min<br>
+            → Champ <code>loginAttempts</code> + <code>lockedUntil</code> sur l'entité
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">RefreshToken, entité custom</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;line-height:1.7;">
+            Token opaque 32 bytes (hex). Stocké en base. <strong style="color:var(--text);">Rotation à chaque usage</strong> : l'ancien token est supprimé, un nouveau est émis. Révocation immédiate sur logout.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 10 — SÉCURITÉ OWASP
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Sécurité</div>
+    <div class="slide-title">14 vulnérabilités corrigées, OWASP Top 10</div>
+    <div class="sep"></div>
+    <div class="owasp-grid" style="margin-bottom:20px;">
+      <div class="owasp-item ok">
+        <div class="onum">A01</div><div class="oname">Broken Access Control</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A02</div><div class="oname">Crypto Failures</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A03</div><div class="oname">Injection</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A04</div><div class="oname">Insecure Design</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A05</div><div class="oname">Misconfiguration</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item partial">
+        <div class="onum">A06</div><div class="oname">Vuln Components</div><div class="ochk" style="color:var(--warn);">~</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A07</div><div class="oname">Auth Failures</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A08</div><div class="oname">Data Integrity</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A09</div><div class="oname">Logging</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+      <div class="owasp-item ok">
+        <div class="onum">A10</div><div class="oname">SSRF</div><div class="ochk" style="color:var(--accent3);">✓</div>
+      </div>
+    </div>
+    <div class="cve-grid">
+      <div class="cve-item"><span class="cve-badge C">CRIT</span><span>CVE-B01 — Crash PHP PretController (Request non injecté)</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B02 — Exposition bibliothèques à tous les auth</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B03 — Élévation de privilège création utilisateur</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B04 — Validation force mot de passe absente</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B05 — Version CGU non vérifiée côté serveur</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B06 — Isolation multi-tenant absente sur prêts</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>CVE-B08 — Rate Limiter configuré mais non connecté</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B09 — 4 méthodes sans contrôle bibliotheque_id</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>CVE-B10 — Validation MDP absente dans update()</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>CVE-B11 — byEmail() accessible aux adhérents (RGPD)</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>CVE-B12 — Statut exemplaire non validé (whitelist)</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>CVE-B13 — Isolation tenant absente PretController</span></div>
+      <div class="cve-item"><span class="cve-badge H">HIGH</span><span>CVE-B14 — Auto-MDP sans current_password requis</span></div>
+      <div class="cve-item"><span class="cve-badge M">MED</span><span>BUG-01 — Champ mot_de_passe vs password (frontend)</span></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 11 — API EXTERNE : MIGRATION GOOGLE BOOKS → OPEN LIBRARY
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">API externe · Décision prise en phase de déploiement</div>
+    <div class="slide-title">Migration Google Books → Open Library</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card" style="border-color:rgba(239,68,68,.4);">
+          <div class="card-title" style="color:var(--danger);">Google Books API — Abandonnée</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Problème découvert en production : le qualificatif <code style="color:var(--warn);">isbn:</code> retourne systématiquement <strong style="color:var(--danger);">totalItems: 0</strong> pour tous les ISBNs, y compris des livres très connus.
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+            <div class="tag red"><code>isbn:9782070360024</code> → 0 résultat</div>
+            <div class="tag red"><code>isbn:9780141439518</code> → 0 résultat</div>
+            <div class="tag yellow">Titre seul → 338 résultats ✓ (clé valide)</div>
+            <div class="tag">Diagnostic : limitation non documentée de l'API</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Flux (inchangé côté bibliothécaire)</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;font-size:13px;color:var(--dimmed);">
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <span style="color:var(--accent);font-weight:700;min-width:20px;">1.</span>
+              Le bibliothécaire saisit un <strong style="color:var(--text);">ISBN</strong> dans le catalogue
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <span style="color:var(--accent);font-weight:700;min-width:20px;">2.</span>
+              <code>GET /api/livres/isbn/{isbn}</code> → OpenLibraryService
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <span style="color:var(--accent);font-weight:700;min-width:20px;">3.</span>
+              Pré-remplissage : titre, auteur, éditeur, année, couverture
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <span style="color:var(--accent3);font-weight:700;min-width:20px;">↳</span>
+              ISBN introuvable → formulaire vide pré-rempli avec l'ISBN
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card" style="border-color:rgba(16,185,129,.4);">
+          <div class="card-title" style="color:var(--accent3);">Open Library API — Retenue</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;">
+            <div class="tag green">Gratuite, sans clé API</div>
+            <div class="tag green">Catalogue mondial 37 M+ livres</div>
+            <div class="tag green">ISBN-13 et ISBN-10 supportés</div>
+            <div class="tag green">Couvertures via covers.openlibrary.org</div>
+            <div class="tag green">Pas de quota, pas de 429</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Implémentation</div>
+          <div class="code" style="margin-top:10px;font-size:11px;">
+<span class="cm">// OpenLibraryService.php</span>
+<span class="kw">const</span> API_URL = <span class="str">'https://openlibrary.org/api/books'</span>;
+
+$response = $this->client->request(<span class="str">'GET'</span>, self::API_URL, [
+    <span class="str">'query'</span> => [
+        <span class="str">'bibkeys'</span> => <span class="str">'ISBN:'</span> . $isbn,
+        <span class="str">'format'</span>  => <span class="str">'json'</span>,
+        <span class="str">'jscmd'</span>   => <span class="str">'details'</span>,
+    ],
+    <span class="str">'timeout'</span> => <span class="num">5.0</span>,
+]);
+<span class="cm">// Réponse : { "ISBN:xxx": { details: {...} } }</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Impact sur le projet</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;line-height:1.7;">
+            Seule la couche service a changé. Les interfaces (Controller, frontend) sont <strong style="color:var(--text);">inchangées</strong>. La variable d'environnement <code>GOOGLE_BOOKS_API_KEY</code> n'est plus nécessaire.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 12 — TESTS
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Qualité</div>
+    <div class="slide-title">8 suites PHPUnit · 67 / 67 tests green</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Suite</th><th>Type</th><th>Couverture</th></tr></thead>
+            <tbody>
+              <tr><td>AuthControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>Login, refresh, logout, brute-force</td></tr>
+              <tr><td>BibliothequeControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>CRUD, contrôle d'accès par rôle</td></tr>
+              <tr><td>UtilisateurControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>CRUD, isolation tenant, rôles</td></tr>
+              <tr><td>ExemplaireControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>CRUD, validation statuts</td></tr>
+              <tr><td>LivreControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>Catalogue, recherche ISBN</td></tr>
+              <tr><td>PretControllerTest</td><td><span class="tag" style="font-size:11px;padding:2px 8px;">Integration</span></td><td>Création, retour, retards</td></tr>
+              <tr><td>PretServiceTest</td><td><span class="tag purple" style="font-size:11px;padding:2px 8px;">Unit</span></td><td>Logique métier prêts</td></tr>
+              <tr><td>GoogleBooksServiceTest</td><td><span class="tag purple" style="font-size:11px;padding:2px 8px;">Unit</span></td><td>API externe, timeouts</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Environnement de test</div>
+          <div class="code" style="margin-top:8px;font-size:12px;">
+<span class="cm"># when@test — security.yaml</span>
+password_hashers:
+  Utilisateur:
+    algorithm: <span class="str">plaintext</span> <span class="cm"># vitesse CI</span>
+
+<span class="cm"># .env.test</span>
+DATABASE_URL=<span class="str">postgresql://...</span>
+APP_ENV=<span class="str">test</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Tests d'intégration : pattern</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:8px;line-height:1.7;">
+            Chaque test d'intégration :<br>
+            → crée un vrai utilisateur JWT dans la DB de test<br>
+            → appelle l'endpoint HTTP réel (KernelBrowser)<br>
+            → vérifie le status code + le JSON de réponse<br>
+            → teste les cas d'erreur (403, 404, 400)
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Exécution</div>
+          <div class="code" style="font-size:12px;margin-top:8px;">
+php bin/phpunit --testdox
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);margin-top:8px;">
+            Également exécuté automatiquement par GitHub Actions à chaque push sur main/develop.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 13 — DOCKER & CI/CD
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Infrastructure</div>
+    <div class="slide-title">Docker + Pipeline CI/CD GitHub Actions</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Docker Compose, 3 services (dev)</div>
+          <div class="code" style="margin-top:10px;font-size:12px;">
+services:
+  <span class="str">app</span>:      <span class="cm"># Symfony PHP 8.3 — :8080</span>
+    build: ../backend
+  <span class="str">db</span>:       <span class="cm"># postgres:16-alpine — :5432</span>
+    image: postgres:16-alpine
+  <span class="str">frontend</span>: <span class="cm"># Node 20-alpine — :5173</span>
+    build: ../frontend
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Lancer l'environnement</div>
+          <div class="code" style="margin-top:8px;font-size:12px;">
+cd dev/docker
+docker compose up -d
+<span class="cm"># Frontend : http://localhost:5173</span>
+<span class="cm"># API      : http://localhost:8080/api</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Pipeline GitHub Actions, 3 jobs</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px;">
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag" style="min-width:130px;justify-content:center;">backend-tests</span>
+              <div style="font-size:12px;color:var(--dimmed);">PHP 8.3 · PostgreSQL 16 service · JWT keygen · migrations · fixtures · PHPUnit<br><span style="color:var(--muted);">Déclenché : push/PR sur main / develop</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag purple" style="min-width:130px;justify-content:center;">frontend-lint</span>
+              <div style="font-size:12px;color:var(--dimmed);">Node 20 · npm ci · <code>tsc --noEmit</code><br><span style="color:var(--muted);">Déclenché : push/PR sur main / develop</span></div>
+            </div>
+            <div style="display:flex;gap:12px;align-items:flex-start;">
+              <span class="tag green" style="min-width:130px;justify-content:center;">docker-build</span>
+              <div style="font-size:12px;color:var(--dimmed);">Buildx · Push Docker Hub (:latest + :vX.Y.Z)<br><span style="color:var(--muted);">Déclenché : tag <code>v*.*.*</code> uniquement, après tests ✓</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Images Docker Hub publiées</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;font-family:'Courier New',monospace;line-height:1.8;">
+            username/bibliotech-backend:latest<br>
+            username/bibliotech-backend:v1.0.0<br>
+            username/bibliotech-frontend:latest<br>
+            username/bibliotech-frontend:v1.0.0
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:8px;">Images prêtes à être tirées par Railway, Render ou tout PaaS Docker-compatible</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 14 — RGPD
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Conformité</div>
+    <div class="slide-title">RGPD, Article 30 et droits des utilisateurs</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Traitement</th><th>Finalité</th><th>Durée</th></tr></thead>
+            <tbody>
+              <tr><td>Comptes utilisateurs</td><td>Authentification, accès services</td><td>Durée compte + 1 an</td></tr>
+              <tr><td>Gestion des prêts</td><td>Suivi emprunts, historique</td><td>5 ans</td></tr>
+              <tr><td>Logs d'authentification</td><td>Sécurité, détection intrusion</td><td>90 jours glissants</td></tr>
+              <tr><td>Acceptation CGU</td><td>Preuve légale de consentement</td><td>Durée compte + 1 an</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+          <div class="card">
+            <div class="card-title">Droits implémentés</div>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:13px;color:var(--dimmed);">
+              <div><span class="tag green" style="font-size:11px;">Droit d'accès</span> GET /api/utilisateurs/me</div>
+              <div><span class="tag green" style="font-size:11px;">Rectification</span> PATCH /api/utilisateurs/me</div>
+              <div><span class="tag green" style="font-size:11px;">Effacement</span> DELETE /api/utilisateurs/me → anonymisation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="card">
+          <div class="card-title">Anonymisation sur suppression</div>
+          <div class="code" style="margin-top:8px;font-size:12px;">
+<span class="cm">// Pas de hard-delete — RGPD</span>
+$user->setNom(<span class="str">'[SUPPRIMÉ]'</span>);
+$user->setPrenom(<span class="str">'[SUPPRIMÉ]'</span>);
+$user->setEmail(<span class="str">'deleted_'</span>.$id.<span class="str">'@deleted'</span>);
+$user->setPassword(<span class="str">''</span>);
+$user->setActive(<span class="kw">false</span>);
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Mesures techniques</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+            <div class="tag green">Argon2id, hachage mots de passe</div>
+            <div class="tag green">HTTPS en production (TLS)</div>
+            <div class="tag green">Clés JWT hors Git (.gitignore)</div>
+            <div class="tag green">Variables sensibles en .env (jamais hardcodées)</div>
+            <div class="tag green">Versionnement CGU avec traçabilité acceptation</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Document</div>
+          <div style="font-size:13px;color:var(--dimmed);margin-top:6px;">
+            Registre complet : <code>docs/registre_traitement.md</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 15 — DIFFICULTÉS & PERSPECTIVES
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Bilan technique</div>
+    <div class="slide-title">Défis surmontés & perspectives</div>
+    <div class="sep"></div>
+    <div class="cols-2">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--warn);margin-bottom:4px;">Difficultés surmontées</div>
+        <div class="card" style="border-color:rgba(245,158,11,.3);">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Isolation multi-tenant incomplète</div>
+          <div style="font-size:12px;color:var(--dimmed);">14 endpoints sans vérification bibliotheque_id. Résolu par audit systématique contrôleur par contrôleur.</div>
+        </div>
+        <div class="card" style="border-color:rgba(245,158,11,.3);">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">JWT stateless vs garde applicative</div>
+          <div style="font-size:12px;color:var(--dimmed);">La logique must_change_password ne peut pas être dans le token (stale). Solution : vérification à chaque navigation dans ProtectedRoute.</div>
+        </div>
+        <div class="card" style="border-color:rgba(245,158,11,.3);">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Docker Compose paths relatifs</div>
+          <div style="font-size:12px;color:var(--dimmed);">Les chemins <code>./backend</code> depuis <code>dev/docker/</code> étaient invalides. Corrigés en <code>../backend</code>.</div>
+        </div>
+        <div class="card" style="border-color:rgba(245,158,11,.3);">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px;">Rate Limiter Symfony : injection</div>
+          <div style="font-size:12px;color:var(--dimmed);">L'injection <code>#[Target('loginIp')]</code> nécessite une syntaxe spécifique Symfony 7, non documentée avec LexikJWT.</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent3);margin-bottom:4px;">Perspectives d'évolution</div>
+        <div class="card" style="border-color:rgba(16,185,129,.3);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:14px;font-weight:600;">Tests E2E Playwright</div>
+            <span class="tag red" style="font-size:11px;">Haute</span>
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);">Scénarios complets navigateur : login → prêt → retour</div>
+        </div>
+        <div class="card" style="border-color:rgba(16,185,129,.4);background:rgba(6,78,59,.15);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:14px;font-weight:600;">Déploiement cloud activé</div>
+            <span class="tag green" style="font-size:11px;">Fait ✓</span>
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);">Backend sur Render · BDD Supabase · tag v1.0.0 en production</div>
+        </div>
+        <div class="card" style="border-color:rgba(16,185,129,.3);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:14px;font-weight:600;">Tauri : packaging desktop</div>
+            <span class="tag yellow" style="font-size:11px;">Moyenne</span>
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);">Wrapper natif (Windows NSIS / macOS .dmg) pour distribution aux bibliothèques</div>
+        </div>
+        <div class="card" style="border-color:rgba(16,185,129,.3);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div style="font-size:14px;font-weight:600;">Application mobile</div>
+            <span class="tag" style="font-size:11px;">Faible</span>
+          </div>
+          <div style="font-size:12px;color:var(--dimmed);">L'API REST est déjà consommable par une app React Native</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 16 — BILAN CDC
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide">
+    <div class="eyebrow">Conformité CDC technique</div>
+    <div class="slide-title">Toutes les exigences couvertes</div>
+    <div class="sep"></div>
+    <div class="tbl-wrap" style="flex:1;">
+      <table class="tbl">
+        <thead><tr><th>Exigence CDC</th><th>Implémentation</th><th>Statut</th></tr></thead>
+        <tbody>
+          <tr><td>Backend Symfony PHP (LTS récent)</td><td>Symfony 7.3 · PHP ≥ 8.3</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Frontend SPA React ou Angular</td><td>React 19 · Vite 8 · TypeScript</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Base de données relationnelle</td><td>PostgreSQL 16 · Doctrine ORM</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>API externe intégrée</td><td>Google Books API (ISBN)</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Docker + Docker Compose</td><td>3 services · Dockerfiles frontend + backend</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Git avec branches</td><td>main / develop / feat/* · PRs</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>CI, tests sur chaque push</td><td>GitHub Actions · backend + frontend</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>CD, build image Docker</td><td>Docker Hub push sur tag v*.*.*</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Tests PHPUnit (unit + intégration)</td><td>8 suites · 6 Integration + 2 Unit</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Sécurité OWASP Top 10</td><td>9/10 couverts · A06 partiel · 14 CVE corrigées</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Mots de passe Argon2/bcrypt</td><td>Argon2id · memory 64 Mo · time 4</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Rate limiting</td><td>Symfony RateLimiter · 10/5min IP · 5/15min compte</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>RGPD, suppression données</td><td>Anonymisation RGPD · registre Article 30</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>Architecture MVC multi-couche</td><td>Controller → Service → Repository → Entity</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+          <tr><td>6 jalons documentés</td><td>Janv. à juil. 2026 · 6 livrables .md</td><td><span class="tag green" style="font-size:11px;">✓ Couvert</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SLIDE 17 — CONCLUSION
+  ════════════════════════════════════════════════════════ -->
+  <div class="slide" style="justify-content:center;background:radial-gradient(ellipse at 30% 60%, rgba(59,130,246,.07) 0%, transparent 55%), var(--bg);">
+    <div style="max-width:780px;margin:auto;">
+      <div class="eyebrow">Conclusion</div>
+      <div class="slide-title" style="font-size:48px;margin-bottom:20px;">BiblioTech, livraison v1.0.0</div>
+      <div class="sep"></div>
+      <div class="stat-grid" style="margin-bottom:28px;">
+        <div class="card text-center">
+          <div class="card-value blue" style="font-size:40px;">51</div>
+          <div class="card-desc">endpoints REST · 9 controllers</div>
+        </div>
+        <div class="card text-center">
+          <div class="card-value green" style="font-size:40px;">67</div>
+          <div class="card-desc">tests PHPUnit — 67 / 67 ✓</div>
+        </div>
+        <div class="card text-center">
+          <div class="card-value purple" style="font-size:40px;">14</div>
+          <div class="card-desc">CVE corrigées</div>
+        </div>
+        <div class="card text-center">
+          <div class="card-value yellow" style="font-size:40px;">6</div>
+          <div class="card-desc">jalons livrés</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:32px;">
+        <span class="tag green">Tag v1.0.0 · main ✓</span>
+        <span class="tag green">Render + Supabase déployés</span>
+        <span class="tag green">CI/CD opérationnel</span>
+        <span class="tag green">OWASP Top 10 couvert</span>
+        <span class="tag green">RGPD Article 30</span>
+        <span class="tag green">JWT RS256 + Argon2id</span>
+      </div>
+      <div style="text-align:center;color:var(--muted);font-size:15px;line-height:1.7;">
+        Produit complet couvrant l'ensemble des exigences du CDC technique — en production.<br>
+        67 tests green · tag v1.0.0 sur main · backend Render · base Supabase.<br>
+        <strong style="color:var(--dimmed);">Merci — place aux questions.</strong>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Progress bar -->
+<div class="progress-bar" id="progress"></div>
+
+<!-- Navigation -->
+<div class="nav">
+  <button id="prev" onclick="go(-1)" title="Précédent (←)">←</button>
+  <span class="counter" id="counter">1 / 17</span>
+  <button id="next" onclick="go(1)" title="Suivant (→)">→</button>
+  <button id="theme-toggle" onclick="toggleTheme()" title="Mode clair / sombre">SOMBRE</button>
+</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let cur = 0;
+  let busy = false;
+  let curScale = 1; // scale of the currently visible slide
+
+  function getScale(el) {
+    const deckH = el.clientHeight;
+    const realH = el.scrollHeight;
+    return realH > deckH * 1.01 ? deckH / realH : 1;
+  }
+
+  function applyScale(el, scale) {
+    if (scale < 1) {
+      el.style.overflow = 'visible';
+      el.style.transform = 'translateX(0) scale(' + scale + ')';
+      el.style.transformOrigin = 'top center';
+    }
+  }
+
+  // Reset + remesure + applique le scale sans animation
+  function autofit() {
+    const el = slides[cur];
+    el.style.removeProperty('transition');
+    el.style.removeProperty('overflow');
+    el.style.removeProperty('transform');
+    el.style.removeProperty('transform-origin');
+    el.getBoundingClientRect();
+    const scale = getScale(el);
+    curScale = scale;
+    applyScale(el, scale);
+    requestAnimationFrame(() => { el.style.removeProperty('transition'); });
+  }
+
+  function go(dir) {
+    if (busy) return;
+    const next = cur + dir;
+    if (next < 0 || next >= slides.length) return;
+    busy = true;
+    const prev = cur;
+
+    // Nettoie l'état de la slide entrante pour mesurer correctement
+    slides[next].style.removeProperty('overflow');
+    slides[next].style.removeProperty('transform');
+    slides[next].style.removeProperty('transform-origin');
+
+    // Calcule le scale final de la slide entrante AVANT la transition
+    const scale = getScale(slides[next]);
+    const offX  = dir > 0 ? 'translateX(60px)' : 'translateX(-60px)';
+
+    // Positionne la slide entrante hors écran, déjà au bon scale (sans transition)
+    slides[next].style.transition = 'none';
+    slides[next].style.transform  = scale < 1 ? offX + ' scale(' + scale + ')' : offX;
+    if (scale < 1) {
+      slides[next].style.overflow = 'visible';
+      slides[next].style.transformOrigin = 'top center';
+    }
+    slides[next].style.opacity = '0';
+    slides[next].getBoundingClientRect(); // force reflow
+    slides[next].style.transition = '';
+
+    // Sort la slide courante en préservant son scale
+    const exitTx = dir > 0 ? 'translateX(-60px)' : 'translateX(60px)';
+    slides[prev].style.transform = curScale < 1
+      ? exitTx + ' scale(' + curScale + ')'
+      : exitTx;
+    slides[prev].style.opacity = '0';
+    slides[prev].style.pointerEvents = 'none';
+    if (curScale < 1) slides[prev].style.removeProperty('overflow');
+
+    // Entre la slide, le scale reste constant — seul translateX revient à 0
+    slides[next].style.transform = scale < 1
+      ? 'translateX(0) scale(' + scale + ')'
+      : 'translateX(0)';
+    slides[next].style.opacity = '1';
+    slides[next].style.pointerEvents = 'all';
+
+    cur = next;
+    curScale = scale;
+    update();
+
+    setTimeout(() => {
+      slides[prev].classList.remove('active');
+      slides[prev].style.cssText = '';
+      slides[next].classList.add('active');
+      // On ne vide pas cssText pour conserver transform/overflow du scale
+      slides[next].style.removeProperty('transition');
+      slides[next].style.removeProperty('opacity');
+      slides[next].style.removeProperty('pointer-events');
+      busy = false;
+    }, 400);
+  }
+
+  function jumpTo(index) {
+    if (busy) return;
+    slides[cur].classList.remove('active');
+    slides[cur].style.cssText = '';
+    cur = index;
+    slides[cur].classList.add('active');
+    autofit();
+    update();
+  }
+
+  function update() {
+    document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+    document.getElementById('prev').disabled = cur === 0;
+    document.getElementById('next').disabled = cur === slides.length - 1;
+    document.getElementById('progress').style.width = ((cur + 1) / slides.length * 100) + '%';
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); go(-1); }
+    if (e.key === 'Home') { e.preventDefault(); jumpTo(0); }
+    if (e.key === 'End') { e.preventDefault(); jumpTo(slides.length - 1); }
+  });
+
+  let touchStartX = 0;
+  document.addEventListener('touchstart', e => touchStartX = e.touches[0].clientX, {passive:true});
+  document.addEventListener('touchend', e => {
+    const dx = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(dx) > 50) go(dx > 0 ? 1 : -1);
+  }, {passive:true});
+
+  window.addEventListener('resize', autofit);
+
+  update();
+  autofit();
+
+  function toggleTheme() {
+    const isLight = document.body.classList.toggle('light-mode');
+    document.getElementById('theme-toggle').textContent = isLight ? 'SOMBRE' : 'CLAIR';
+  }
+</script>
+
+</body></html>
